@@ -1,0 +1,17 @@
+{
+  "name": "ai-chatbot-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node backend/server.js",
+    "build": "echo 'No build step required'"
+  },
+  "dependencies": {
+    "express": "^4.21.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "@supabase/supabase-js": "^2.46.1",
+    "groq-sdk": "^0.8.0",
+    "uuid": "^11.0.3"
+  }
+}

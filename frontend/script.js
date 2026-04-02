@@ -1,0 +1,164 @@
+let sessionId = localStorage.getItem('chat_session_id') || null;
+const chatBox = document.getElementById('chatBox');
+const userInput = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+
+// Auto-resize textarea
+userInput.addEventListener('input', () => {
+  userInput.style.height = 'auto';
+  userInput.style.height = Math.min(userInput.scrollHeight, 120) + 'px';
+});
+
+// Enter to send, Shift+Enter for newline
+userInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+function hideWelcome() {
+  const welcome = document.getElementById('welcome');
+  if (welcome) welcome.remove();
+}
+
+function getTime() {
+  return new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+}
+
+function appendMessage(role, content) {
+  hideWelcome();
+  const div = document.createElement('div');
+  div.className = `message ${role}`;
+
+  const avatar = role === 'user' ? '👤' : '🤖';
+
+  // Simple markdown-ish formatting
+  let formatted = content
+    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+
+  div.innerHTML = `
+    <div class="avatar">${avatar}</div>
+    <div>
+      <div class="bubble">${formatted}</div>
+      <div class="time">${getTime()}</div>
+    </div>
+  `;
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
+  return div;
+}
+
+function showTyping() {
+  hideWelcome();
+  const div = document.createElement('div');
+  div.className = 'typing-indicator';
+  div.id = 'typingIndicator';
+  div.innerHTML = `
+    <div class="avatar" style="background: linear-gradient(135deg,#7c6af7,#a78bfa); box-shadow:0 0 16px rgba(124,106,247,0.25)">🤖</div>
+    <div class="typing-bubble">
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+    </div>
+  `;
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function hideTyping() {
+  const t = document.getElementById('typingIndicator');
+  if (t) t.remove();
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+async function sendMessage() {
+  const msg = userInput.value.trim();
+  if (!msg || sendBtn.disabled) return;
+
+  userInput.value = '';
+  userInput.style.height = 'auto';
+  sendBtn.disabled = true;
+
+  appendMessage('user', msg);
+  showTyping();
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, session_id: sessionId })
+    });
+
+    const data = await res.json();
+    hideTyping();
+
+    if (!res.ok) throw new Error(data.error || 'Server error');
+
+    sessionId = data.session_id;
+    localStorage.setItem('chat_session_id', sessionId);
+    appendMessage('assistant', data.reply);
+
+  } catch (err) {
+    hideTyping();
+    showToast('❌ ' + (err.message || 'Something went wrong, please try again!'));
+  }
+
+  sendBtn.disabled = false;
+  userInput.focus();
+}
+
+function sendSuggestion(text) {
+  userInput.value = text;
+  sendMessage();
+}
+
+async function clearChat() {
+  if (!confirm('Are you sure you want to clear the entire chat history?')) return;
+
+  if (sessionId) {
+    try {
+      await fetch(`/api/history/${sessionId}`, { method: 'DELETE' });
+    } catch (e) {}
+  }
+
+  sessionId = null;
+  localStorage.removeItem('chat_session_id');
+
+  chatBox.innerHTML = `
+    <div class="welcome" id="welcome">
+      <div class="welcome-icon">✨</div>
+      <h2>Hello! I'm your AI Assistant</h2>
+      <p>Ask me anything — I'm here to help you with any topic!</p>
+      <div class="suggestions">
+        <button class="suggestion-chip" onclick="sendSuggestion('What is Python programming?')">🐍 What is Python?</button>
+        <button class="suggestion-chip" onclick="sendSuggestion('Tell me a fun science fact')">🔬 Science fact</button>
+        <button class="suggestion-chip" onclick="sendSuggestion('Tell me a short story')">📖 Tell me a story</button>
+        <button class="suggestion-chip" onclick="sendSuggestion('Give me tips to reduce stress')">😌 Stress relief tips</button>
+        <button class="suggestion-chip" onclick="sendSuggestion('What is artificial intelligence?')">🧠 What is AI?</button>
+        <button class="suggestion-chip" onclick="sendSuggestion('Give me some healthy breakfast ideas')">🥗 Breakfast ideas</button>
+      </div>
+    </div>`;
+}
+
+// Load existing session
+if (sessionId) {
+  fetch(`/api/history/${sessionId}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.messages && data.messages.length > 0) {
+        data.messages.forEach(m => appendMessage(m.role, m.content));
+      }
+    })
+    .catch(() => {});
+}
