@@ -8,7 +8,7 @@ const sidebar = document.getElementById('sidebar');
 // Create overlay for mobile
 const overlay = document.createElement('div');
 overlay.className = 'sidebar-overlay';
-document.body.appendChild(overlay);
+document.querySelector('.app-container').appendChild(overlay);
 overlay.onclick = toggleSidebar;
 
 // Auto-resize textarea
