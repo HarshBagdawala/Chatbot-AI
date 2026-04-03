@@ -124,6 +124,41 @@ app.get("/api/history/:session_id", async (req, res) => {
   }
 });
 
+// Get all chat sessions
+app.get("/api/sessions", async (req, res) => {
+  try {
+    // Fetch unique session_ids with the first message content as a title
+    // PostgreSQL: SELECT DISTINCT ON (session_id)
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .select("session_id, content, created_at")
+      .order("session_id")
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+
+    // Manual grouping to get the first message of each session
+    const sessionsMap = new Map();
+    data.forEach(msg => {
+      if (!sessionsMap.has(msg.session_id)) {
+        sessionsMap.set(msg.session_id, {
+          session_id: msg.session_id,
+          title: msg.content.substring(0, 40) + (msg.content.length > 40 ? "..." : ""),
+          created_at: msg.created_at
+        });
+      }
+    });
+
+    const sessions = Array.from(sessionsMap.values())
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    res.json({ sessions });
+  } catch (err) {
+    console.error("Sessions fetch error:", err.message);
+    res.status(500).json({ error: "Could not fetch sessions." });
+  }
+});
+
 // Clear chat session
 app.delete("/api/history/:session_id", async (req, res) => {
   const { session_id } = req.params;

@@ -2,6 +2,14 @@ let sessionId = localStorage.getItem('chat_session_id') || null;
 const chatBox = document.getElementById('chatBox');
 const userInput = document.getElementById('userInput');
 const sendBtn = document.getElementById('sendBtn');
+const sidebarHistory = document.getElementById('sidebarHistory');
+const sidebar = document.getElementById('sidebar');
+
+// Create overlay for mobile
+const overlay = document.createElement('div');
+overlay.className = 'sidebar-overlay';
+document.body.appendChild(overlay);
+overlay.onclick = toggleSidebar;
 
 // Auto-resize textarea
 userInput.addEventListener('input', () => {
@@ -16,6 +24,11 @@ userInput.addEventListener('keydown', (e) => {
     sendMessage();
   }
 });
+
+function toggleSidebar() {
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('show');
+}
 
 function hideWelcome() {
   const welcome = document.getElementById('welcome');
@@ -77,14 +90,104 @@ function hideTyping() {
 
 function showToast(msg) {
   const toast = document.getElementById('toast');
+  if (!toast) return;
   toast.textContent = msg;
   toast.classList.add('show');
   setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
+// ─── Session Management ──────────────────────────────────────────────────────
+
+async function loadSessions() {
+  try {
+    const res = await fetch('/api/sessions');
+    const data = await res.json();
+    
+    sidebarHistory.innerHTML = '';
+    
+    if (data.sessions && data.sessions.length > 0) {
+      data.sessions.forEach(session => {
+        const item = document.createElement('div');
+        item.className = `sidebar-item ${session.session_id === sessionId ? 'active' : ''}`;
+        item.textContent = session.title || 'New Chat';
+        item.onclick = () => selectSession(session.session_id);
+        sidebarHistory.appendChild(item);
+      });
+    } else {
+      sidebarHistory.innerHTML = '<div style="padding:20px; font-size:12px; color:var(--text-muted); text-align:center;">No recent chats</div>';
+    }
+  } catch (err) {
+    console.error('Error loading sessions:', err);
+  }
+}
+
+async function selectSession(id) {
+  if (id === sessionId) return;
+  
+  sessionId = id;
+  localStorage.setItem('chat_session_id', sessionId);
+  
+  // Close sidebar on mobile
+  sidebar.classList.remove('open');
+  overlay.classList.remove('show');
+  
+  // Clear UI and load history
+  chatBox.innerHTML = '';
+  showTyping();
+  
+  try {
+    const res = await fetch(`/api/history/${sessionId}`);
+    const data = await res.json();
+    hideTyping();
+    
+    if (data.messages && data.messages.length > 0) {
+      data.messages.forEach(m => appendMessage(m.role, m.content));
+    } else {
+      showWelcome();
+    }
+    loadSessions(); // Update active state
+  } catch (err) {
+    hideTyping();
+    showToast('❌ Could not load chat');
+  }
+}
+
+function startNewChat() {
+  sessionId = null;
+  localStorage.removeItem('chat_session_id');
+  chatBox.innerHTML = '';
+  showWelcome();
+  loadSessions();
+  
+  // Close sidebar on mobile
+  sidebar.classList.remove('open');
+  overlay.classList.remove('show');
+}
+
+function showWelcome() {
+  chatBox.innerHTML = `
+    <div class="welcome" id="welcome">
+      <div class="welcome-icon">✨</div>
+      <h2>Hello! I'm your AI Assistant</h2>
+      <p>Ask me anything — I'm here to help you with any topic!</p>
+      <div class="suggestions">
+        <button class="suggestion-chip" onclick="sendSuggestion('What is Python programming?')">🐍 What is Python?</button>
+        <button class="suggestion-chip" onclick="sendSuggestion('Tell me a fun science fact')">🔬 Science fact</button>
+        <button class="suggestion-chip" onclick="sendSuggestion('Tell me a short story')">📖 Tell me a story</button>
+        <button class="suggestion-chip" onclick="sendSuggestion('Give me tips to reduce stress')">😌 Stress relief tips</button>
+        <button class="suggestion-chip" onclick="sendSuggestion('What is artificial intelligence?')">🧠 What is AI?</button>
+        <button class="suggestion-chip" onclick="sendSuggestion('Give me some healthy breakfast ideas')">🥗 Breakfast ideas</button>
+      </div>
+    </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function sendMessage() {
   const msg = userInput.value.trim();
   if (!msg || sendBtn.disabled) return;
+
+  const isNewSession = !sessionId;
 
   userInput.value = '';
   userInput.style.height = 'auto';
@@ -108,6 +211,11 @@ async function sendMessage() {
     sessionId = data.session_id;
     localStorage.setItem('chat_session_id', sessionId);
     appendMessage('assistant', data.reply);
+    
+    // Refresh sidebar if it's the first message of a session
+    if (isNewSession) {
+      loadSessions();
+    }
 
   } catch (err) {
     hideTyping();
@@ -124,7 +232,7 @@ function sendSuggestion(text) {
 }
 
 async function clearChat() {
-  if (!confirm('Are you sure you want to clear the entire chat history?')) return;
+  if (!confirm('Are you sure you want to clear this entire chat history?')) return;
 
   if (sessionId) {
     try {
@@ -132,33 +240,22 @@ async function clearChat() {
     } catch (e) {}
   }
 
-  sessionId = null;
-  localStorage.removeItem('chat_session_id');
-
-  chatBox.innerHTML = `
-    <div class="welcome" id="welcome">
-      <div class="welcome-icon">✨</div>
-      <h2>Hello! I'm your AI Assistant</h2>
-      <p>Ask me anything — I'm here to help you with any topic!</p>
-      <div class="suggestions">
-        <button class="suggestion-chip" onclick="sendSuggestion('What is Python programming?')">🐍 What is Python?</button>
-        <button class="suggestion-chip" onclick="sendSuggestion('Tell me a fun science fact')">🔬 Science fact</button>
-        <button class="suggestion-chip" onclick="sendSuggestion('Tell me a short story')">📖 Tell me a story</button>
-        <button class="suggestion-chip" onclick="sendSuggestion('Give me tips to reduce stress')">😌 Stress relief tips</button>
-        <button class="suggestion-chip" onclick="sendSuggestion('What is artificial intelligence?')">🧠 What is AI?</button>
-        <button class="suggestion-chip" onclick="sendSuggestion('Give me some healthy breakfast ideas')">🥗 Breakfast ideas</button>
-      </div>
-    </div>`;
+  startNewChat();
 }
 
-// Load existing session
+// Initialize
+loadSessions();
 if (sessionId) {
   fetch(`/api/history/${sessionId}`)
     .then(r => r.json())
     .then(data => {
       if (data.messages && data.messages.length > 0) {
         data.messages.forEach(m => appendMessage(m.role, m.content));
+      } else {
+        showWelcome();
       }
     })
-    .catch(() => {});
+    .catch(() => showWelcome());
+} else {
+  showWelcome();
 }
