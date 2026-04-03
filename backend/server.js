@@ -5,8 +5,6 @@ const { createClient } = require("@supabase/supabase-js");
 const Groq = require("groq-sdk");
 const { v4: uuidv4 } = require("uuid");
 const path = require("path");
-const axios = require("axios");
-const cheerio = require("cheerio");
 
 const app = express();
 app.use(cors());
@@ -24,23 +22,42 @@ const supabase = createClient(
 // ─── Web Search ──────────────────────────────────────────────────────────────
 async function performWebSearch(query) {
   try {
-    const { data } = await axios.get(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+    const response = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+      method: "GET",
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
     });
 
-    const $ = cheerio.load(data);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const html = await response.text();
     let results = [];
 
-    $('.result__body').each((i, el) => {
-      if (i >= 3) return false; // Top 3 results
-      const title = $(el).find('.result__title').text().trim();
-      const snippet = $(el).find('.result__snippet').text().trim();
-      if (title && snippet) {
-        results.push(`Title: ${title}\nSnippet: ${snippet}`);
-      }
-    });
+    // Simple parser to avoid heavy dependencies like cheerio
+    const chunks = html.split('class="result__snippet');
+    
+    // Start from 1 because index 0 is before the first snippet
+    for (let i = 1; i < Math.min(chunks.length, 4); i++) {
+        const chunk = chunks[i];
+        
+        // Find title text before this snippet (by looking at the previous chunk)
+        const prevChunk = chunks[i-1];
+        const titleMatch = prevChunk.match(/<h2 class="result__title">[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>$/i) || prevChunk.match(/class="result__title"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>[\s\S]*?$/i);
+        
+        // Find snippet text
+        const snippetMatch = chunk.match(/^[^>]*>([\s\S]*?)<\/a>/i);
+
+        if (titleMatch && snippetMatch) {
+            const cleanTitle = titleMatch[1].replace(/<\/?[^>]+(>|$)/g, "").trim();
+            const cleanSnippet = snippetMatch[1].replace(/<\/?[^>]+(>|$)/g, "").trim();
+            
+            // To HTML decode basic entities
+            const finalTitle = cleanTitle.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"');
+            const finalSnippet = cleanSnippet.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"');
+
+            results.push(`Title: ${finalTitle}\nSnippet: ${finalSnippet}`);
+        }
+    }
 
     if (results.length === 0) return "No web results found.";
     return results.join('\n\n');
