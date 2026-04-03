@@ -46,13 +46,29 @@ function appendMessage(role, content) {
 
   const avatar = role === 'user' ? '👤' : '🤖';
 
-  // Simple markdown-ish formatting
-  let formatted = content
-    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/\n/g, '<br>');
+  // ─── Better Markdown-ish Formatting ───
+  let formatted = content;
+  const blocks = [];
+
+  // 1. Extract Triple Backtick Blocks (Code Blocks)
+  formatted = formatted.replace(/```([\s\S]*?)```/g, (match, code) => {
+    const id = `__BLOCK_${blocks.length}__`;
+    blocks.push(`<pre><code>${code.trim()}</code></pre>`);
+    return id;
+  });
+
+  // 2. Format the rest (Bold, Italics, Newlines)
+  formatted = formatted
+    .replace(/`([^`]+)`/g, '<code>$1</code>') // Inline code
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+    .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italics
+    .replace(/\n/g, '<br>'); // Newlines
+
+  // 3. Put Code Blocks back
+  blocks.forEach((block, i) => {
+    formatted = formatted.replace(`__BLOCK_${i}__`, block);
+  });
+  // ────────────────────────────────────────
 
   div.innerHTML = `
     <div class="avatar">${avatar}</div>
