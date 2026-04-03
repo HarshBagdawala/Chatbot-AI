@@ -5,6 +5,79 @@ const sendBtn = document.getElementById('sendBtn');
 const sidebarHistory = document.getElementById('sidebarHistory');
 const sidebar = document.getElementById('sidebar');
 
+// ─── Voice AI Setup (Web Speech API) ─────────────────────────────────────────
+let aiVoiceEnabled = true;
+const voiceToggleBtn = document.getElementById('voiceToggleBtn');
+const micBtn = document.getElementById('micBtn');
+
+function toggleAIVoice() {
+  aiVoiceEnabled = !aiVoiceEnabled;
+  if (aiVoiceEnabled) {
+    if(voiceToggleBtn) voiceToggleBtn.classList.add('active');
+    showToast('🔊 AI Voice Enabled');
+  } else {
+    if(voiceToggleBtn) voiceToggleBtn.classList.remove('active');
+    window.speechSynthesis.cancel();
+    showToast('🔇 AI Voice Muted');
+  }
+}
+
+function speakText(text) {
+  if (!aiVoiceEnabled || !('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  // Remove markdown formatting to improve pronunciation
+  let cleanText = text.replace(/```[\s\S]*?```/g, ' Code snippet. ').replace(/[_*`#]/g, '');
+  const utterance = new SpeechSynthesisUtterance(cleanText);
+  utterance.lang = navigator.language || 'en-US'; // Use system language
+  window.speechSynthesis.speak(utterance);
+}
+
+let recognition;
+let isRecording = false;
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  // Detect spoken language automatically based on browser locale
+  recognition.lang = navigator.language || 'en-US'; 
+  recognition.interimResults = false;
+
+  recognition.onstart = () => {
+    isRecording = true;
+    if(micBtn) micBtn.classList.add('listening');
+    userInput.placeholder = "Listening...";
+  };
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    userInput.value += (userInput.value ? ' ' : '') + transcript;
+    userInput.value = userInput.value.trim();
+    // Auto send the message when speech finishes
+    sendMessage(); 
+  };
+
+  recognition.onerror = (evt) => {
+    stopRecording();
+    showToast('🎤 Error listening to microphone.');
+  };
+
+  recognition.onend = () => {
+    stopRecording();
+  };
+}
+
+function toggleRecording() {
+  if (!recognition) return showToast('⚠️ Speech Recognition not supported in this browser.');
+  isRecording ? recognition.stop() : recognition.start();
+}
+
+function stopRecording() {
+  isRecording = false;
+  if(micBtn) micBtn.classList.remove('listening');
+  if(userInput) userInput.placeholder = "Ask me anything...";
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Create overlay for mobile
 const overlay = document.createElement('div');
 overlay.className = 'sidebar-overlay';
@@ -227,6 +300,9 @@ async function sendMessage() {
     sessionId = data.session_id;
     localStorage.setItem('chat_session_id', sessionId);
     appendMessage('assistant', data.reply);
+    
+    // Speak the response using Voice AI
+    speakText(data.reply);
     
     // Refresh sidebar if it's the first message of a session
     if (isNewSession) {
