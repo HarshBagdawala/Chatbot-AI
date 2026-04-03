@@ -331,13 +331,28 @@ async function sendMessage(isVoice = false) {
 
     if (!res.ok) throw new Error(data.error || 'Server error');
 
+    let aiReply = data.reply;
+    let musicRequested = null;
+    
+    // Parse [PLAY_MUSIC: song_name]
+    const musicMatch = aiReply.match(/\[PLAY_MUSIC:\s*(.*?)\]/i);
+    if (musicMatch) {
+      musicRequested = musicMatch[1].trim();
+      aiReply = aiReply.replace(/\[PLAY_MUSIC:([^\]]+)\]/ig, '').trim();
+      if (!aiReply) aiReply = "Playing your music request now 🎵";
+    }
+
     sessionId = data.session_id;
     localStorage.setItem('chat_session_id', sessionId);
-    appendMessage('assistant', data.reply);
+    appendMessage('assistant', aiReply);
     
     // Speak the response using Voice AI ONLY if user sent via voice
     if (isVoice) {
-      speakText(data.reply);
+      speakText(aiReply);
+    }
+    
+    if (musicRequested) {
+      playMusicCommand(musicRequested);
     }
     
     // Refresh sidebar if it's the first message of a session
@@ -386,4 +401,86 @@ if (sessionId) {
     .catch(() => showWelcome());
 } else {
   showWelcome();
+}
+
+// ─── Music Player Setup (YouTube IFrame API) ─────────────────────────────────
+let ytPlayer;
+let isMusicPlaying = false;
+let musicPlayerContainer = document.getElementById('musicPlayer');
+let musicTitle = document.getElementById('musicTitle');
+let musicIcon = document.getElementById('musicIcon');
+let playIconPath = document.getElementById('playIcon');
+
+function onYouTubeIframeAPIReady() {
+  ytPlayer = new YT.Player('ytplayer', {
+    height: '0',
+    width: '0',
+    playerVars: {
+      autoplay: 1,
+      controls: 0,
+      disablekb: 1,
+      fs: 0,
+    },
+    events: {
+      'onReady': onPlayerReady,
+      'onStateChange': onPlayerStateChange,
+      'onError': onPlayerError
+    }
+  });
+}
+
+function onPlayerReady(event) {
+  // YT Player ready
+}
+
+function onPlayerStateChange(event) {
+  if (event.data == YT.PlayerState.PLAYING) {
+    isMusicPlaying = true;
+    if(musicIcon) musicIcon.classList.add('spin');
+    if(playIconPath) playIconPath.setAttribute('d', 'M6 19h4V5H6v14zm8-14v14h4V5h-4z'); 
+  } else if (event.data == YT.PlayerState.PAUSED || event.data == YT.PlayerState.ENDED) {
+    isMusicPlaying = false;
+    if(musicIcon) musicIcon.classList.remove('spin');
+    if(playIconPath) playIconPath.setAttribute('d', 'M8 5v14l11-7z');
+  }
+}
+
+function onPlayerError(e) {
+  showToast('❌ Could not play music. Try another song.');
+  closeMusic();
+}
+
+function playMusicCommand(songName) {
+  if (!ytPlayer || !ytPlayer.loadPlaylist) {
+    showToast('⚠️ Music Player loading... Try again in a few seconds.');
+    return;
+  }
+  
+  if(musicTitle) musicTitle.textContent = songName;
+  if(musicPlayerContainer) musicPlayerContainer.classList.remove('disabled');
+  
+  // Use loadPlaylist with search query to play the top result
+  ytPlayer.loadPlaylist({
+    listType: 'search',
+    list: songName,
+    index: 0,
+    startSeconds: 0,
+    suggestedQuality: 'small'
+  });
+  
+  showToast('🎵 Playing: ' + songName);
+}
+
+function toggleMusic() {
+  if (!ytPlayer) return;
+  if (isMusicPlaying) {
+    ytPlayer.pauseVideo();
+  } else {
+    ytPlayer.playVideo();
+  }
+}
+
+function closeMusic() {
+  if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
+  if (musicPlayerContainer) musicPlayerContainer.classList.add('disabled');
 }

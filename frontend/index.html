@@ -102,6 +102,28 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
+  <!-- Music Player UI -->
+  <div class="music-player disabled" id="musicPlayer">
+    <div class="music-info">
+      <div class="music-icon" id="musicIcon">🎵</div>
+      <div class="music-details">
+        <p class="music-title" id="musicTitle">Searching music...</p>
+        <p class="music-status">YouTube Music</p>
+      </div>
+    </div>
+    <div class="music-controls">
+      <button class="music-btn" onclick="toggleMusic()" id="musicTogglePlayBtn" title="Play/Pause">
+        <svg viewBox="0 0 24 24" id="playPauseIcon" fill="currentColor">
+          <path d="M8 5v14l11-7z" id="playIcon"/>
+        </svg>
+      </button>
+      <button class="music-btn close-btn" onclick="closeMusic()" title="Close Player">✖</button>
+    </div>
+    <!-- Hidden YT Player -->
+    <div id="ytplayer" style="position:absolute; width:0; height:0; top:-9999px; left:-9999px;"></div>
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
   <script src="script.js"></script>
 </body>
 
