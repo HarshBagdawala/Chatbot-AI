@@ -5,6 +5,8 @@ const { createClient } = require("@supabase/supabase-js");
 const Groq = require("groq-sdk");
 const { v4: uuidv4 } = require("uuid");
 const path = require("path");
+const axios = require("axios");
+const cheerio = require("cheerio");
 
 const app = express();
 app.use(cors());
@@ -19,6 +21,35 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
+// ─── Web Search ──────────────────────────────────────────────────────────────
+async function performWebSearch(query) {
+  try {
+    const { data } = await axios.get(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+
+    const $ = cheerio.load(data);
+    let results = [];
+
+    $('.result__body').each((i, el) => {
+      if (i >= 3) return false; // Top 3 results
+      const title = $(el).find('.result__title').text().trim();
+      const snippet = $(el).find('.result__snippet').text().trim();
+      if (title && snippet) {
+        results.push(`Title: ${title}\nSnippet: ${snippet}`);
+      }
+    });
+
+    if (results.length === 0) return "No web results found.";
+    return results.join('\n\n');
+  } catch (err) {
+    console.error("Web search failed:", err.message);
+    return "Error performing web search.";
+  }
+}
+
 // ─── System Prompt ───────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are a helpful, knowledgeable, and friendly AI assistant.
 
@@ -29,6 +60,7 @@ Key behavior rules:
 4. For complex topics, break down your answer into simple steps.
 5. If you don't know something, be honest and say so.
 6. MUSIC REQUESTS: If the user asks you to play a song or music (e.g., "play some music", "play Believer by Imagine Dragons"), you MUST include exactly this tag in your response: \`[PLAY_MUSIC: song_name]\` (replace song_name with the requested song title, or "Relaxing Lofi Music" if no specific song is requested).
+7. WEB SEARCH: You have a tool called 'search_web' available. You MUST use it whenever the user asks for real-time information, such as today's weather, breaking news, or current prices. Do NOT hallucinate real-time data.
 
 You can help with: coding, science, history, general knowledge, math, creative writing, advice, and much more!`;
 
@@ -64,15 +96,69 @@ app.post("/api/chat", async (req, res) => {
       { role: "user", content: message },
     ];
 
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "search_web",
+          description: "Search the internet for real-time information, news, weather, or facts.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+                description: "The search query to look up on the internet (e.g. 'Mumbai weather today').",
+              },
+            },
+            required: ["query"],
+          },
+        },
+      },
+    ];
+
     // 3. Call Groq API
-    const completion = await groq.chat.completions.create({
+    let completion = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
       messages,
+      tools: tools,
+      tool_choice: "auto",
       temperature: 0.7,
       max_tokens: 1024,
     });
 
-    const assistantReply = completion.choices[0]?.message?.content || "Sorry, I could not generate a response.";
+    let assistantMessage = completion.choices[0]?.message;
+
+    // Handle tool calls
+    if (assistantMessage.tool_calls) {
+      messages.push(assistantMessage); // Append assistant's tool call request to history
+
+      for (const toolCall of assistantMessage.tool_calls) {
+        if (toolCall.function.name === 'search_web') {
+          const args = JSON.parse(toolCall.function.arguments);
+          console.log("Searching web for:", args.query);
+          const searchResults = await performWebSearch(args.query);
+          
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            name: toolCall.function.name,
+            content: searchResults,
+          });
+        }
+      }
+
+      // Second API call with the tool results
+      completion = await groq.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
+        messages,
+        temperature: 0.7,
+        max_tokens: 1024,
+      });
+
+      assistantMessage = completion.choices[0]?.message;
+    }
+
+    const assistantReply = assistantMessage?.content || "Sorry, I could not generate a response.";
 
     // 4. Save user message + assistant reply to Supabase
     const { error: insertError } = await supabase

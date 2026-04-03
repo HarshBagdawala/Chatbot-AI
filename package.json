@@ -7,10 +7,12 @@
     "build": "echo 'No build step required'"
   },
   "dependencies": {
-    "express": "^4.21.1",
+    "@supabase/supabase-js": "^2.46.1",
+    "axios": "^1.14.0",
+    "cheerio": "^1.2.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "@supabase/supabase-js": "^2.46.1",
+    "express": "^4.21.1",
     "groq-sdk": "^0.8.0",
     "uuid": "^11.0.3"
   }
