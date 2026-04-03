@@ -22,13 +22,47 @@ function toggleAIVoice() {
   }
 }
 
+// Load and select a female voice
+let availableVoices = [];
+if ('speechSynthesis' in window) {
+  availableVoices = window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => {
+    availableVoices = window.speechSynthesis.getVoices();
+  };
+}
+
+function getFemaleVoice() {
+  if (!availableVoices.length) availableVoices = window.speechSynthesis.getVoices();
+  // Attempt to find a female voice for Hindi or English
+  return availableVoices.find(v => 
+    v.name.includes('Female') || 
+    v.name.includes('Zira') || 
+    v.name.includes('Samantha') || 
+    v.name.includes('Victoria') ||
+    v.name.includes('Aditi') || // Indian Female
+    (v.lang.includes('hi-IN') && !v.name.includes('Male'))
+  ) || availableVoices.find(v => v.lang.startsWith('en') && v.name.includes('Female')) || availableVoices[0];
+}
+
 function speakText(text) {
   if (!aiVoiceEnabled || !('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
   // Remove markdown formatting to improve pronunciation
   let cleanText = text.replace(/```[\s\S]*?```/g, ' Code snippet. ').replace(/[_*`#]/g, '');
   const utterance = new SpeechSynthesisUtterance(cleanText);
-  utterance.lang = navigator.language || 'en-US'; // Use system language
+  
+  const femaleVoice = getFemaleVoice();
+  if (femaleVoice) {
+    utterance.voice = femaleVoice;
+    utterance.lang = femaleVoice.lang;
+  } else {
+    utterance.lang = navigator.language || 'en-US';
+  }
+  
+  if (!femaleVoice || !femaleVoice.name.match(/female|zira|samantha|aditi/i)) {
+    utterance.pitch = 1.2; // Fallback to make custom voices sound slightly more feminine
+  }
+
   window.speechSynthesis.speak(utterance);
 }
 
@@ -52,8 +86,8 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     const transcript = event.results[0][0].transcript;
     userInput.value += (userInput.value ? ' ' : '') + transcript;
     userInput.value = userInput.value.trim();
-    // Auto send the message when speech finishes
-    sendMessage(); 
+    // Auto send the message when speech finishes, pass true to indicate voice triggered
+    sendMessage(true); 
   };
 
   recognition.onerror = (evt) => {
@@ -272,7 +306,7 @@ function showWelcome() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function sendMessage() {
+async function sendMessage(isVoice = false) {
   const msg = userInput.value.trim();
   if (!msg || sendBtn.disabled) return;
 
@@ -301,8 +335,10 @@ async function sendMessage() {
     localStorage.setItem('chat_session_id', sessionId);
     appendMessage('assistant', data.reply);
     
-    // Speak the response using Voice AI
-    speakText(data.reply);
+    // Speak the response using Voice AI ONLY if user sent via voice
+    if (isVoice) {
+      speakText(data.reply);
+    }
     
     // Refresh sidebar if it's the first message of a session
     if (isNewSession) {
