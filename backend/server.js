@@ -82,6 +82,57 @@ async function performWebSearch(query) {
   }
 }
 
+// ─── Weather API ─────────────────────────────────────────────────────────────
+async function getWeatherData(city) {
+  try {
+    console.log(`Fetching weather for: ${city}`);
+    
+    // 1. Geocoding: City Name -> Lat/Lon
+    const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`, {
+      headers: { 'User-Agent': 'AI-Chatbot-Assistant/1.0' }
+    });
+    const geoData = await geoRes.json();
+    
+    if (!geoData || geoData.length === 0) {
+      return `Could not find coordinates for "${city}". Please check the spelling.`;
+    }
+    
+    const { lat, lon, display_name } = geoData[0];
+    
+    // 2. Weather: Lat/Lon -> Forecast
+    const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m`);
+    const weatherData = await weatherRes.json();
+    
+    if (!weatherData.current) throw new Error("Weather data unavailable");
+    
+    const curr = weatherData.current;
+    
+    // Simple weather code mapping
+    const weatherCodes = {
+      0: "Clear sky",
+      1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+      45: "Fog", 48: "Depositing rime fog",
+      51: "Light drizzle", 53: "Moderate drizzle", 55: "Dense drizzle",
+      61: "Slight rain", 63: "Moderate rain", 65: "Heavy rain",
+      71: "Slight snow fall", 73: "Moderate snow fall", 75: "Heavy snow fall",
+      95: "Thunderstorm"
+    };
+    
+    const condition = weatherCodes[curr.weather_code] || "Conditions unknown";
+    
+    return `Current Weather in ${display_name}:
+- Temperature: ${curr.temperature_2m}°C (Feels like ${curr.apparent_temperature}°C)
+- Condition: ${condition}
+- Humidity: ${curr.relative_humidity_2m}%
+- Wind Speed: ${curr.wind_speed_10m} km/h
+- Precipitation: ${curr.precipitation} mm`;
+
+  } catch (err) {
+    console.error("Weather API error:", err.message);
+    return "Error: Could not retrieve weather data at this time.";
+  }
+}
+
 // ─── System Prompt ───────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are a helpful, knowledgeable, and friendly AI assistant.
 
@@ -92,7 +143,8 @@ Key behavior rules:
 4. For complex topics, break down your answer into simple steps.
 5. If you don't know something, be honest and say so.
 6. MUSIC REQUESTS: If the user asks you to play a song or music (e.g., "play some music", "play Believer by Imagine Dragons"), you MUST include exactly this tag in your response: \`[PLAY_MUSIC: song_name]\` (replace song_name with the requested song title, or "Relaxing Lofi Music" if no specific song is requested).
-7. WEB SEARCH: For any questions about real-time events, weather, or current information, use the provided tool. Do NOT hallucinate real-time data.
+7. WEB SEARCH: For general real-time news or information, use 'search_web'. 
+8. WEATHER: For ANY questions about weather, temperature, or forecasts for a specific city, you MUST use the 'get_weather' tool. Do NOT guess or use old data.
 
 You can help with: coding, science, history, general knowledge, math, creative writing, advice, and much more!`;
 
@@ -189,16 +241,33 @@ app.post("/api/chat", async (req, res) => {
         type: "function",
         function: {
           name: "search_web",
-          description: "Search the internet for real-time information, news, weather, or facts.",
+          description: "Search the internet for real-time information, news, or general facts.",
           parameters: {
             type: "object",
             properties: {
               query: {
                 type: "string",
-                description: "The search query to look up on the internet (e.g. 'Mumbai weather today').",
+                description: "The search query (e.g. 'latest news on AI').",
               },
             },
             required: ["query"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_weather",
+          description: "Get current weather and temperature for a specific city.",
+          parameters: {
+            type: "object",
+            properties: {
+              city: {
+                type: "string",
+                description: "The name of the city (e.g. 'Surat', 'New York').",
+              },
+            },
+            required: ["city"],
           },
         },
       },
@@ -221,18 +290,23 @@ app.post("/api/chat", async (req, res) => {
       messages.push(assistantMessage); // Append assistant's tool call request to history
 
       for (const toolCall of assistantMessage.tool_calls) {
+        let toolResults = "";
+        
         if (toolCall.function.name === 'search_web') {
           const args = JSON.parse(toolCall.function.arguments);
           console.log("Searching web for:", args.query);
-          const searchResults = await performWebSearch(args.query);
-          
-          messages.push({
-            role: "tool",
-            tool_call_id: toolCall.id,
-            name: toolCall.function.name,
-            content: searchResults,
-          });
+          toolResults = await performWebSearch(args.query);
+        } else if (toolCall.function.name === 'get_weather') {
+          const args = JSON.parse(toolCall.function.arguments);
+          toolResults = await getWeatherData(args.city);
         }
+        
+        messages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          name: toolCall.function.name,
+          content: toolResults,
+        });
       }
 
       // Second API call with the tool results
