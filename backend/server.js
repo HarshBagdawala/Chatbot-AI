@@ -293,16 +293,20 @@ app.post("/api/chat", async (req, res) => {
     console.log("Groq Completion Choice:", JSON.stringify(completion.choices[0], null, 2));
     let assistantMessage = completion.choices[0]?.message;
 
-    // Handle tool calls
-    if (assistantMessage.tool_calls) {
-      messages.push(assistantMessage); // Append assistant's tool call request to history
+    // Handle tool calls (Loop to allow multiple turns if needed)
+    let toolTurns = 0;
+    while (assistantMessage.tool_calls && toolTurns < 5) {
+      toolTurns++;
+      console.log(`Tool Turn ${toolTurns}: Handling ${assistantMessage.tool_calls.length} calls`);
+      
+      messages.push(assistantMessage);
 
       for (const toolCall of assistantMessage.tool_calls) {
         let toolResults = "";
         
         if (toolCall.function.name === 'search_web') {
           const args = JSON.parse(toolCall.function.arguments);
-          console.log("Searching web for:", args.query);
+          console.log(`Searching web for: ${args.query}`);
           toolResults = await performWebSearch(args.query);
         } else if (toolCall.function.name === 'get_weather') {
           const args = JSON.parse(toolCall.function.arguments);
@@ -317,7 +321,7 @@ app.post("/api/chat", async (req, res) => {
         });
       }
 
-      // Second API call with the tool results
+      // Call Groq again with tool results
       completion = await groq.chat.completions.create({
         model: "llama-3.3-70b-versatile",
         messages,
@@ -326,7 +330,7 @@ app.post("/api/chat", async (req, res) => {
         max_tokens: 1024,
       });
 
-      console.log("Groq Tool Response Choice:", JSON.stringify(completion.choices[0], null, 2));
+      console.log(`Groq Loop Turn ${toolTurns} Choice:`, JSON.stringify(completion.choices[0], null, 2));
       assistantMessage = completion.choices[0]?.message;
     }
 
