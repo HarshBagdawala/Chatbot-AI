@@ -1,11 +1,10 @@
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 const express = require("express");
 const cors = require("cors");
 const { createClient } = require("@supabase/supabase-js");
 const Groq = require("groq-sdk");
 const { v4: uuidv4 } = require("uuid");
-const path = require("path");
-
 const app = express();
 app.use(cors());
 app.use(express.json());
