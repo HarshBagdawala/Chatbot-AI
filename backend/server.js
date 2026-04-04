@@ -87,14 +87,19 @@ async function getWeatherData(city) {
   try {
     console.log(`Fetching weather for: ${city}`);
     
-    // 1. Geocoding: City Name -> Lat/Lon
-    const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`, {
-      headers: { 'User-Agent': 'AI-Chatbot-Assistant/1.0' }
+    // 1. Geocoding: City/Location Name -> Lat/Lon
+    // We use a robust User-Agent as Nominatim requires it
+    const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1&addressdetails=1`, {
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'en'
+      }
     });
     const geoData = await geoRes.json();
     
     if (!geoData || geoData.length === 0) {
-      return `Could not find coordinates for "${city}". Please check the spelling.`;
+      console.log(`Failed to find coordinates for: ${city}`);
+      return `I'm sorry, I couldn't find the location "${city}" in my database. Please double-check the spelling of the city or country name. 🌏`;
     }
     
     const { lat, lon, display_name } = geoData[0];
@@ -147,8 +152,8 @@ Key behavior rules:
 3. For complex topics, break down your answer into simple steps. 🔢
 4. If you don't know something, be honest and say so.
 5. MUSIC REQUESTS: If the user asks you to play a song or music (e.g., "play some music", "play Believer by Imagine Dragons"), you MUST include exactly this tag in your response: \`[PLAY_MUSIC: song_name]\` (replace song_name with the requested song title, or "Relaxing Lofi Music" if no specific song is requested). 🎵
-6. WEB SEARCH: For general real-time news or information, use 'search_web'. 🔍
-7. WEATHER: For ANY questions about weather, temperature, or forecasts for a specific city, you MUST use the 'get_weather' tool. Do NOT guess or use old data. 🌦️
+6. WEATHER: For ANY questions about weather, temperature, or forecasts for ANY city, region, or country globally, you MUST use the 'get_weather' tool. Do NOT guess or use old data. 🌦️
+7. WEB SEARCH: For other real-time news or general facts, use 'search_web'. 🔍
 
 You can help with: coding, science, history, general knowledge, math, creative writing, advice, and much more!`;
 
@@ -262,13 +267,13 @@ app.post("/api/chat", async (req, res) => {
         type: "function",
         function: {
           name: "get_weather",
-          description: "Get current weather and temperature for a specific city.",
+          description: "Get real-time weather and temperature for ANY city, region, or country worldwide.",
           parameters: {
             type: "object",
             properties: {
               city: {
                 type: "string",
-                description: "The name of the city (e.g. 'Surat', 'New York').",
+                description: "The name of the location (e.g. 'Mumbai', 'London', 'California', 'India').",
               },
             },
             required: ["city"],
