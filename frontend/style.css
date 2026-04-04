@@ -26,6 +26,7 @@ body {
   background: var(--bg);
   color: var(--text);
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   position: relative;
 }
@@ -57,6 +58,7 @@ body::after {
 .app-container {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
   overflow: hidden;
   position: relative;
@@ -656,6 +658,7 @@ header {
   .sidebar {
     position: fixed;
     height: 100vh;
+    height: 100dvh;
     left: -300px;
     width: 280px;
     box-shadow: 20px 0 50px rgba(0, 0, 0, 0.5);
