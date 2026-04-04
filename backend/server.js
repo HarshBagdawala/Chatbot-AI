@@ -5,6 +5,7 @@ const { createClient } = require("@supabase/supabase-js");
 const Groq = require("groq-sdk");
 const { v4: uuidv4 } = require("uuid");
 const path = require("path");
+const fs = require("fs");
 
 const app = express();
 app.use(cors());
@@ -82,6 +83,44 @@ Key behavior rules:
 You can help with: coding, science, history, general knowledge, math, creative writing, advice, and much more!`;
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
+
+// ─── Auth Routes ───
+const USERS_FILE = path.join(__dirname, 'users.json');
+
+const readUsers = () => {
+  if (!fs.existsSync(USERS_FILE)) return [];
+  try { return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')); } catch(e) { return []; }
+};
+const writeUsers = (users) => fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+
+app.post('/api/register', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+  if (username.toLowerCase() === 'guest') return res.status(400).json({ error: 'Username not allowed' });
+
+  const users = readUsers();
+  if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
+    return res.status(400).json({ error: 'Username already exists' });
+  }
+
+  users.push({ username, password });
+  writeUsers(users);
+  res.json({ success: true });
+});
+
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+
+  const users = readUsers();
+  const user = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
+  
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid username or password' });
+  }
+  
+  res.json({ success: true, username: user.username });
+});
 
 // Send a message
 app.post("/api/chat", async (req, res) => {
@@ -179,23 +218,25 @@ app.post("/api/chat", async (req, res) => {
     const assistantReply = assistantMessage?.content || "Sorry, I could not generate a response.";
 
     // 4. Save user message + assistant reply to Supabase
-    const { error: insertError } = await supabase
-      .from("chat_messages")
-      .insert([
-        {
-          session_id: sessionId,
-          role: "user",
-          content: message,
-        },
-        {
-          session_id: sessionId,
-          role: "assistant",
-          content: assistantReply,
-        },
-      ]);
+    if (username !== 'guest') {
+      const { error: insertError } = await supabase
+        .from("chat_messages")
+        .insert([
+          {
+            session_id: sessionId,
+            role: "user",
+            content: message,
+          },
+          {
+            session_id: sessionId,
+            role: "assistant",
+            content: assistantReply,
+          },
+        ]);
 
-    if (insertError) {
-      console.error("Supabase insert error:", insertError.message);
+      if (insertError) {
+        console.error("Supabase insert error:", insertError.message);
+      }
     }
 
     // 5. Return response

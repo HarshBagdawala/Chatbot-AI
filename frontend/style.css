@@ -943,3 +943,107 @@ header {
   background: rgba(239, 68, 68, 0.1);
   border-color: var(--danger);
 }
+
+/* ─── Auth Extra Styles ─── */
+.auth-links {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-top: 5px;
+}
+.auth-links a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+.auth-links a:hover {
+  text-decoration: underline;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--border);
+}
+.divider::before, .divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--border);
+}
+.divider span {
+  padding: 0 10px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.btn-guest {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.btn-guest:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+/* ─── User Profile Sidebar ─── */
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.profile-avatar {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.profile-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.profile-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.btn-logout-small {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.btn-logout-small:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+.btn-logout-small svg {
+  width: 18px;
+  height: 18px;
+}

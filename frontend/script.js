@@ -8,6 +8,29 @@ const sidebarHistory = document.getElementById('sidebarHistory');
 const sidebar = document.getElementById('sidebar');
 
 // ─── Authentication ────────────────────────────────────────────────────────────
+let isLoginMode = true;
+
+function toggleAuthMode() {
+  isLoginMode = !isLoginMode;
+  const btn = document.getElementById('submitAuthBtn');
+  const toggleText = document.getElementById('authToggleText');
+  
+  if (isLoginMode) {
+    if(btn) btn.textContent = 'Sign In';
+    if(toggleText) toggleText.innerHTML = `Don't have an account? <a href="#" onclick="toggleAuthMode()">Sign up</a>`;
+  } else {
+    if(btn) btn.textContent = 'Create Account';
+    if(toggleText) toggleText.innerHTML = `Already have an account? <a href="#" onclick="toggleAuthMode()">Sign in</a>`;
+  }
+}
+
+function updateProfileUI() {
+  const profileName = document.getElementById('profileName');
+  if (profileName) {
+    profileName.textContent = currentUsername === 'guest' ? 'Guest' : '@' + currentUsername;
+  }
+}
+
 function checkAuth() {
   const overlay = document.getElementById('loginOverlay');
   const appContainer = document.getElementById('appContainer');
@@ -16,7 +39,15 @@ function checkAuth() {
     if(overlay) overlay.classList.remove('active');
     if(appContainer) appContainer.style.display = 'flex';
     if(sidebar) sidebar.style.display = 'flex'; // Ensure sidebar behaves normally
-    loadSessions();
+    
+    updateProfileUI();
+
+    if (currentUsername !== 'guest') {
+      loadSessions();
+    } else {
+      if(sidebarHistory) sidebarHistory.innerHTML = '<div style="padding:20px; font-size:12px; color:var(--text-muted); text-align:center;">Guest history not saved</div>';
+    }
+
     if (sessionId) {
       loadHistory(sessionId);
     } else {
@@ -28,19 +59,47 @@ function checkAuth() {
   }
 }
 
-function handleLogin() {
-  const user = document.getElementById('usernameInput')?.value.trim();
-  if (!user) {
-    showToast("⚠️ Please enter a username.");
+async function handleAuth() {
+  const username = document.getElementById('usernameInput')?.value.trim();
+  const password = document.getElementById('passwordInput')?.value.trim();
+  
+  if (!username || !password) {
+    showToast("⚠️ Please enter username and password.");
     return;
   }
-  currentUsername = user;
+
+  const endpoint = isLoginMode ? '/api/login' : '/api/register';
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    
+    if (!res.ok) throw new Error(data.error || 'Authentication failed');
+
+    if (!isLoginMode) {
+      showToast("✅ Registered! Please sign in.");
+      toggleAuthMode();
+      return; 
+    }
+
+    currentUsername = username;
+    localStorage.setItem('chat_username', currentUsername);
+    sessionId = null;
+    localStorage.removeItem('chat_session_id');
+    checkAuth();
+  } catch (e) {
+    showToast("❌ " + e.message);
+  }
+}
+
+function continueAsGuest() {
+  currentUsername = 'guest';
   localStorage.setItem('chat_username', currentUsername);
-  
-  // Clear any existing session from previous user
   sessionId = null;
   localStorage.removeItem('chat_session_id');
-  
   checkAuth();
 }
 
@@ -49,15 +108,16 @@ function handleLogout() {
   sessionId = null;
   localStorage.removeItem('chat_username');
   localStorage.removeItem('chat_session_id');
-  document.getElementById('usernameInput').value = '';
+  if(document.getElementById('usernameInput')) document.getElementById('usernameInput').value = '';
+  if(document.getElementById('passwordInput')) document.getElementById('passwordInput').value = '';
   checkAuth();
 }
 
-// Enter key for login
-const usernameInput = document.getElementById('usernameInput');
-if(usernameInput) {
-  usernameInput.addEventListener('keydown', (e) => {
-    if(e.key === 'Enter') handleLogin();
+// Enter key for auth
+const passwordInput = document.getElementById('passwordInput');
+if(passwordInput) {
+  passwordInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') handleAuth();
   });
 }
 
@@ -279,7 +339,7 @@ function showToast(msg) {
 // ─── Session Management ──────────────────────────────────────────────────────
 
 async function loadSessions() {
-  if (!currentUsername) return;
+  if (!currentUsername || currentUsername === 'guest') return;
   try {
     const res = await fetch(`/api/sessions?username=${encodeURIComponent(currentUsername)}`);
     const data = await res.json();
