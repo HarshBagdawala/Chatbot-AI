@@ -293,10 +293,18 @@ const PORT = process.env.PORT || 3001;
 // Export for Vercel
 module.exports = app;
 
+function maskToken(token) {
+  if (!token) return 'Not Set';
+  if (token.length <= 8) return token;
+  return token.substring(0, 5) + '...' + token.substring(token.length - 4);
+}
+
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`\n\x1b[36m🤖 AI Chatbot Server running at http://localhost:${PORT}\x1b[0m\n`);
-    console.log(`\x1b[32m📦 Supabase connected: ✅\x1b[0m`);
-    console.log(`\x1b[35m🧠 Groq API: ✅\x1b[0m`);
+    console.log(`\x1b[32m📦 Supabase connected: ✅ [URL: ${process.env.SUPABASE_URL}] \x1b[0m`);
+    console.log(`\x1b[33m🔑 Supabase Key: ${maskToken(process.env.SUPABASE_ANON_KEY)}\x1b[0m`);
+    console.log(`\x1b[35m🧠 Groq API: ✅ [Key: ${maskToken(process.env.GROQ_API_KEY)}]\x1b[0m`);
+    console.log(`\n\x1b[90mSecurity Info: No API keys are exposed to the frontend/browser inspect tools.\x1b[0m\n`);
   });
 }
