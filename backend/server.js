@@ -77,7 +77,7 @@ Key behavior rules:
 4. For complex topics, break down your answer into simple steps.
 5. If you don't know something, be honest and say so.
 6. MUSIC REQUESTS: If the user asks you to play a song or music (e.g., "play some music", "play Believer by Imagine Dragons"), you MUST include exactly this tag in your response: \`[PLAY_MUSIC: song_name]\` (replace song_name with the requested song title, or "Relaxing Lofi Music" if no specific song is requested).
-7. WEB SEARCH: You have a tool called 'search_web' available. You MUST use it whenever the user asks for real-time information, such as today's weather, breaking news, or current prices. Do NOT hallucinate real-time data.
+7. WEB SEARCH: For any questions about real-time events, weather, or current information, use the provided tool. Do NOT hallucinate real-time data.
 
 You can help with: coding, science, history, general knowledge, math, creative writing, advice, and much more!`;
 
@@ -224,6 +224,7 @@ app.post("/api/chat", async (req, res) => {
       completion = await groq.chat.completions.create({
         model: "llama-3.3-70b-versatile",
         messages,
+        tools: tools,
         temperature: 0.7,
         max_tokens: 1024,
       });
