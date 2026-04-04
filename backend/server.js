@@ -5,7 +5,6 @@ const { createClient } = require("@supabase/supabase-js");
 const Groq = require("groq-sdk");
 const { v4: uuidv4 } = require("uuid");
 const path = require("path");
-const fs = require("fs");
 
 const app = express();
 app.use(cors());
@@ -85,41 +84,58 @@ You can help with: coding, science, history, general knowledge, math, creative w
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 // ─── Auth Routes ───
-const USERS_FILE = path.join(__dirname, 'users.json');
-
-const readUsers = () => {
-  if (!fs.existsSync(USERS_FILE)) return [];
-  try { return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')); } catch(e) { return []; }
-};
-const writeUsers = (users) => fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-
-app.post('/api/register', (req, res) => {
+app.post('/api/register', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
   if (username.toLowerCase() === 'guest') return res.status(400).json({ error: 'Username not allowed' });
 
-  const users = readUsers();
-  if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
-    return res.status(400).json({ error: 'Username already exists' });
-  }
+  try {
+    // Check if user already exists
+    const { data: existingUser, error: checkError } = await supabase
+      .from('users')
+      .select('username')
+      .eq('username', username)
+      .single();
 
-  users.push({ username, password });
-  writeUsers(users);
-  res.json({ success: true });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+
+    // Insert new user
+    const { error: insertError } = await supabase
+      .from('users')
+      .insert([{ username, password }]);
+
+    if (insertError) throw insertError;
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Registration error:", err.message);
+    res.status(500).json({ error: 'Could not register user' });
+  }
 });
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
 
-  const users = readUsers();
-  const user = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
-  
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid username or password' });
+  try {
+    const { data: user, error: loginError } = await supabase
+      .from('users')
+      .select('username')
+      .eq('username', username)
+      .eq('password', password)
+      .single();
+
+    if (loginError || !user) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    res.json({ success: true, username: user.username });
+  } catch (err) {
+    console.error("Login error:", err.message);
+    res.status(500).json({ error: 'Something went wrong during login' });
   }
-  
-  res.json({ success: true, username: user.username });
 });
 
 // Send a message
