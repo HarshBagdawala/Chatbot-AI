@@ -290,6 +290,7 @@ app.post("/api/chat", async (req, res) => {
       max_tokens: 1024,
     });
 
+    console.log("Groq Completion Choice:", JSON.stringify(completion.choices[0], null, 2));
     let assistantMessage = completion.choices[0]?.message;
 
     // Handle tool calls
@@ -325,6 +326,7 @@ app.post("/api/chat", async (req, res) => {
         max_tokens: 1024,
       });
 
+      console.log("Groq Tool Response Choice:", JSON.stringify(completion.choices[0], null, 2));
       assistantMessage = completion.choices[0]?.message;
     }
 
