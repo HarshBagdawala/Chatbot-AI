@@ -1,9 +1,66 @@
 let sessionId = localStorage.getItem('chat_session_id') || null;
+let currentUsername = localStorage.getItem('chat_username') || null;
+
 const chatBox = document.getElementById('chatBox');
 const userInput = document.getElementById('userInput');
 const sendBtn = document.getElementById('sendBtn');
 const sidebarHistory = document.getElementById('sidebarHistory');
 const sidebar = document.getElementById('sidebar');
+
+// ─── Authentication ────────────────────────────────────────────────────────────
+function checkAuth() {
+  const overlay = document.getElementById('loginOverlay');
+  const appContainer = document.getElementById('appContainer');
+  
+  if (currentUsername) {
+    if(overlay) overlay.classList.remove('active');
+    if(appContainer) appContainer.style.display = 'flex';
+    if(sidebar) sidebar.style.display = 'flex'; // Ensure sidebar behaves normally
+    loadSessions();
+    if (sessionId) {
+      loadHistory(sessionId);
+    } else {
+      showWelcome();
+    }
+  } else {
+    if(overlay) overlay.classList.add('active');
+    if(appContainer) appContainer.style.display = 'none';
+  }
+}
+
+function handleLogin() {
+  const user = document.getElementById('usernameInput')?.value.trim();
+  if (!user) {
+    showToast("⚠️ Please enter a username.");
+    return;
+  }
+  currentUsername = user;
+  localStorage.setItem('chat_username', currentUsername);
+  
+  // Clear any existing session from previous user
+  sessionId = null;
+  localStorage.removeItem('chat_session_id');
+  
+  checkAuth();
+}
+
+function handleLogout() {
+  currentUsername = null;
+  sessionId = null;
+  localStorage.removeItem('chat_username');
+  localStorage.removeItem('chat_session_id');
+  document.getElementById('usernameInput').value = '';
+  checkAuth();
+}
+
+// Enter key for login
+const usernameInput = document.getElementById('usernameInput');
+if(usernameInput) {
+  usernameInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') handleLogin();
+  });
+}
+
 
 // ─── Voice AI Setup (Web Speech API) ─────────────────────────────────────────
 let aiVoiceEnabled = true;
@@ -222,8 +279,9 @@ function showToast(msg) {
 // ─── Session Management ──────────────────────────────────────────────────────
 
 async function loadSessions() {
+  if (!currentUsername) return;
   try {
-    const res = await fetch('/api/sessions');
+    const res = await fetch(`/api/sessions?username=${encodeURIComponent(currentUsername)}`);
     const data = await res.json();
     
     sidebarHistory.innerHTML = '';
@@ -244,22 +302,9 @@ async function loadSessions() {
   }
 }
 
-async function selectSession(id) {
-  if (id === sessionId) return;
-  
-  sessionId = id;
-  localStorage.setItem('chat_session_id', sessionId);
-  
-  // Close sidebar on mobile
-  sidebar.classList.remove('open');
-  overlay.classList.remove('show');
-  
-  // Clear UI and load history
-  chatBox.innerHTML = '';
-  showTyping();
-  
+async function loadHistory(id) {
   try {
-    const res = await fetch(`/api/history/${sessionId}`);
+    const res = await fetch(`/api/history/${id}`);
     const data = await res.json();
     hideTyping();
     
@@ -273,6 +318,23 @@ async function selectSession(id) {
     hideTyping();
     showToast('❌ Could not load chat');
   }
+}
+
+async function selectSession(id) {
+  if (id === sessionId) return;
+  
+  sessionId = id;
+  localStorage.setItem('chat_session_id', sessionId);
+  
+  // Close sidebar on mobile
+  if(sidebar) sidebar.classList.remove('open');
+  if(overlay) overlay.classList.remove('show');
+  
+  // Clear UI and load history
+  chatBox.innerHTML = '';
+  showTyping();
+  
+  loadHistory(sessionId);
 }
 
 function startNewChat() {
@@ -323,7 +385,7 @@ async function sendMessage(isVoice = false) {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg, session_id: sessionId })
+      body: JSON.stringify({ message: msg, session_id: sessionId, username: currentUsername })
     });
 
     const data = await res.json();
@@ -387,21 +449,7 @@ async function clearChat() {
 }
 
 // Initialize
-loadSessions();
-if (sessionId) {
-  fetch(`/api/history/${sessionId}`)
-    .then(r => r.json())
-    .then(data => {
-      if (data.messages && data.messages.length > 0) {
-        data.messages.forEach(m => appendMessage(m.role, m.content));
-      } else {
-        showWelcome();
-      }
-    })
-    .catch(() => showWelcome());
-} else {
-  showWelcome();
-}
+checkAuth();
 
 // ─── Music Player Setup (YouTube IFrame API) ─────────────────────────────────
 let ytPlayer;

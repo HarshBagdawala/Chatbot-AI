@@ -13,7 +13,22 @@
 
 <body>
 
-  <div class="app-container">
+  <!-- Login Overlay -->
+  <div class="login-overlay active" id="loginOverlay">
+    <div class="login-modal">
+      <div class="login-header">
+        <div class="logo-icon" style="font-size: 3rem; margin-bottom: 0.5rem;">🤖</div>
+        <h2>Welcome</h2>
+        <p>Enter your username to access your chats</p>
+      </div>
+      <div class="login-form">
+        <input type="text" id="usernameInput" placeholder="Enter your username" autocomplete="off" />
+        <button class="btn-login" onclick="handleLogin()">Start Chatting</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-container" id="appContainer" style="display: none;">
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
@@ -48,6 +63,13 @@
           </div>
         </div>
         <div class="header-actions">
+          <button class="btn-logout" id="logoutBtn" onclick="handleLogout()" title="Logout">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
           <button class="btn-voice-toggle active" id="voiceToggleBtn" onclick="toggleAIVoice()" title="Toggle AI Voice">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 5L6 9H2v6h4l5 4V5z"></path>

@@ -85,13 +85,14 @@ You can help with: coding, science, history, general knowledge, math, creative w
 
 // Send a message
 app.post("/api/chat", async (req, res) => {
-  const { message, session_id } = req.body;
+  const { message, session_id, username } = req.body;
 
   if (!message || !message.trim()) {
     return res.status(400).json({ error: "Message is required" });
   }
 
-  const sessionId = session_id || uuidv4();
+  const userPrefix = username ? `${username}_` : 'guest_';
+  const sessionId = session_id || `${userPrefix}${uuidv4()}`;
 
   try {
     // 1. Fetch last 10 messages for context from Supabase
@@ -231,13 +232,19 @@ app.get("/api/history/:session_id", async (req, res) => {
 // Get all chat sessions
 app.get("/api/sessions", async (req, res) => {
   try {
-    // Fetch unique session_ids with the first message content as a title
-    // PostgreSQL: SELECT DISTINCT ON (session_id)
-    const { data, error } = await supabase
+    const { username } = req.query;
+
+    let query = supabase
       .from("chat_messages")
       .select("session_id, content, created_at")
       .order("session_id")
       .order("created_at", { ascending: true });
+
+    if (username) {
+      query = query.like("session_id", `${username}_%`);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
