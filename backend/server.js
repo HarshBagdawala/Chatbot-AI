@@ -82,59 +82,57 @@ async function performWebSearch(query) {
   }
 }
 
-// ─── Weather API ─────────────────────────────────────────────────────────────
+// ─── Weather API (OpenWeatherMap) ───────────────────────────────────────────
 async function getWeatherData(city) {
+  const apiKey = process.env.OPENWEATHER_API_KEY;
+  if (!apiKey || apiKey.includes('your_openweather_api_key_here')) {
+    return "Weather API is not configured. Please add your OpenWeatherMap API key to the .env file. 🛠️";
+  }
+
   try {
     console.log(`Fetching weather for: ${city}`);
     
-    // 1. Geocoding: City/Location Name -> Lat/Lon
-    // We use a robust User-Agent as Nominatim requires it
-    const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1&addressdetails=1`, {
-      headers: { 
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept-Language': 'en'
-      }
-    });
-    const geoData = await geoRes.json();
+    // 1. Fetch current weather from OpenWeatherMap
+    const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`;
+    const response = await fetch(url);
+    const data = await response.json();
     
-    if (!geoData || geoData.length === 0) {
-      console.log(`Failed to find coordinates for: ${city}`);
-      return `I'm sorry, I couldn't find the location "${city}" in my database. Please double-check the spelling of the city or country name. 🌏`;
+    if (data.cod !== 200) {
+      console.log(`OpenWeatherMap error: ${data.message}`);
+      if (data.cod === "404") return `I'm sorry, I couldn't find the location "${city}". Please check the spelling. 🌏`;
+      if (data.cod === 401) return "Invalid API Key. Please check your OpenWeatherMap credentials. 🔑";
+      throw new Error(data.message);
     }
     
-    const { lat, lon, display_name } = geoData[0];
-    
-    // 2. Weather: Lat/Lon -> Forecast
-    const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m`);
-    const weatherData = await weatherRes.json();
-    
-    if (!weatherData.current) throw new Error("Weather data unavailable");
-    
-    const curr = weatherData.current;
-    
-    // Simple weather code mapping
-    const weatherCodes = {
-      0: "Clear sky",
-      1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
-      45: "Fog", 48: "Depositing rime fog",
-      51: "Light drizzle", 53: "Moderate drizzle", 55: "Dense drizzle",
-      61: "Slight rain", 63: "Moderate rain", 65: "Heavy rain",
-      71: "Slight snow fall", 73: "Moderate snow fall", 75: "Heavy snow fall",
-      95: "Thunderstorm"
-    };
-    
-    const condition = weatherCodes[curr.weather_code] || "Conditions unknown";
-    
-    return `Current Weather in ${display_name}:
-- Temperature: ${curr.temperature_2m}°C (Feels like ${curr.apparent_temperature}°C)
-- Condition: ${condition}
-- Humidity: ${curr.relative_humidity_2m}%
-- Wind Speed: ${curr.wind_speed_10m} km/h
-- Precipitation: ${curr.precipitation} mm`;
+    // 2. Parse and format the response
+    const { main, weather, wind, name, sys } = data;
+    const temp = Math.round(main.temp);
+    const feelsLike = Math.round(main.feels_like);
+    const condition = weather[0].main;
+    const description = weather[0].description;
+    const humidity = main.humidity;
+    const windSpeed = wind.speed;
+    const country = sys.country;
+
+    // Get a relevant emoji based on the weather condition
+    let emoji = "🌡️";
+    const condLower = condition.toLowerCase();
+    if (condLower.includes("cloud")) emoji = "☁️";
+    else if (condLower.includes("rain")) emoji = "🌧️";
+    else if (condLower.includes("clear")) emoji = "☀️";
+    else if (condLower.includes("snow")) emoji = "❄️";
+    else if (condLower.includes("thunder")) emoji = "⛈️";
+    else if (condLower.includes("mist") || condLower.includes("fog")) emoji = "🌫️";
+
+    return `### Current Weather in ${name}, ${country} ${emoji}
+- **Temperature**: ${temp}°C (Feels like ${feelsLike}°C)
+- **Condition**: ${condition} (${description})
+- **Humidity**: ${humidity}%
+- **Wind Speed**: ${windSpeed} m/s`;
 
   } catch (err) {
-    console.error("Weather API error:", err.message);
-    return "Error: Could not retrieve weather data at this time.";
+    console.error("OpenWeatherMap API error:", err.message);
+    return "Error: Could not retrieve weather data from OpenWeatherMap at this time. 🛑";
   }
 }
 
