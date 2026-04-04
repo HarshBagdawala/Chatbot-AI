@@ -21,29 +21,39 @@ const supabase = createClient(
 // ─── Web Search ──────────────────────────────────────────────────────────────
 async function performWebSearch(query) {
   try {
+    // Attempting a more robust search source or better headers for DuckDuckGo
     const response = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
       method: "GET",
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://duckduckgo.com/',
+        'Cache-Control': 'max-age=0',
+        'DNT': '1'
       }
     });
 
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+       console.error(`Search Engine responded with ${response.status}`);
+       if (response.status === 403) return "Search engine blocked the request. Please try again later or ask something else.";
+       throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
     const html = await response.text();
     let results = [];
 
-    // Simple parser to avoid heavy dependencies like cheerio
+    // Improved parsing for DDG HTML results
     const chunks = html.split('class="result__snippet');
     
-    // Start from 1 because index 0 is before the first snippet
-    for (let i = 1; i < Math.min(chunks.length, 4); i++) {
+    for (let i = 1; i < Math.min(chunks.length, 5); i++) {
         const chunk = chunks[i];
-        
-        // Find title text before this snippet (by looking at the previous chunk)
         const prevChunk = chunks[i-1];
-        const titleMatch = prevChunk.match(/<h2 class="result__title">[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>$/i) || prevChunk.match(/class="result__title"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>[\s\S]*?$/i);
         
-        // Find snippet text
+        // Extract title
+        const titleMatch = prevChunk.match(/class="result__title"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i);
+        
+        // Extract snippet (it's at the start of the current chunk)
         const snippetMatch = chunk.match(/^[^>]*>([\s\S]*?)<\/a>/i);
 
         if (titleMatch && snippetMatch) {
@@ -51,18 +61,24 @@ async function performWebSearch(query) {
             const cleanSnippet = snippetMatch[1].replace(/<\/?[^>]+(>|$)/g, "").trim();
             
             // To HTML decode basic entities
-            const finalTitle = cleanTitle.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"');
-            const finalSnippet = cleanSnippet.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"');
+            const finalTitle = cleanTitle.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+            const finalSnippet = cleanSnippet.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 
             results.push(`Title: ${finalTitle}\nSnippet: ${finalSnippet}`);
         }
     }
 
-    if (results.length === 0) return "No web results found.";
+    if (results.length === 0) {
+      // Fallback: If no snippets, try to find links
+      const linkMatches = html.match(/class="result__url"[^>]*>([\s\S]*?)<\/a>/gi);
+      if (linkMatches) return "Found search results but could not extract details. Try a more specific question.";
+      return "No web results found.";
+    }
+    
     return results.join('\n\n');
   } catch (err) {
     console.error("Web search failed:", err.message);
-    return "Error performing web search.";
+    return "Error performing web search. Search engine is currently unavailable.";
   }
 }
 
