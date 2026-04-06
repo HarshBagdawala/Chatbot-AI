@@ -558,25 +558,30 @@ function onPlayerError(e) {
   closeMusic();
 }
 
-function playMusicCommand(songName) {
-  if (!ytPlayer || !ytPlayer.loadPlaylist) {
+async function playMusicCommand(songName) {
+  if (!ytPlayer || !ytPlayer.loadVideoById) {
     showToast('⚠️ Music Player loading... Try again in a few seconds.');
     return;
   }
   
-  if(musicTitle) musicTitle.textContent = songName;
+  if(musicTitle) musicTitle.textContent = 'Searching...';
   if(musicPlayerContainer) musicPlayerContainer.classList.remove('disabled');
   
-  // Use loadPlaylist with search query to play the top result
-  ytPlayer.loadPlaylist({
-    listType: 'search',
-    list: songName,
-    index: 0,
-    startSeconds: 0,
-    suggestedQuality: 'small'
-  });
-  
-  showToast('🎵 Playing: ' + songName);
+  try {
+    const res = await fetch(`/api/music/search?q=${encodeURIComponent(songName)}`);
+    const data = await res.json();
+    
+    if (!res.ok || !data.videoId) {
+      throw new Error(data.error || 'Music not found');
+    }
+
+    if(musicTitle) musicTitle.textContent = songName;
+    ytPlayer.loadVideoById(data.videoId);
+    showToast('🎵 Playing: ' + songName);
+  } catch (err) {
+    showToast('❌ ' + err.message);
+    closeMusic();
+  }
 }
 
 function toggleMusic() {

@@ -82,6 +82,29 @@ async function performWebSearch(query) {
   }
 }
 
+async function searchYoutubeVideo(query) {
+  try {
+    const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent("site:youtube.com " + query)}`;
+    const response = await fetch(searchUrl, {
+      method: "GET",
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      }
+    });
+
+    if (!response.ok) return null;
+    
+    const html = await response.text();
+    // Look for watch?v=XXXXXXX
+    const match = html.match(/watch\?v=([a-zA-Z0-9_-]{11})/);
+    return match ? match[1] : null;
+  } catch (err) {
+    console.error("YouTube search failed:", err.message);
+    return null;
+  }
+}
+
+
 // ─── Weather API (OpenWeatherMap) ───────────────────────────────────────────
 async function getWeatherData(city) {
   const apiKey = process.env.OPENWEATHER_API_KEY;
@@ -447,6 +470,17 @@ app.delete("/api/history/:session_id", async (req, res) => {
     console.error("Delete error:", err.message);
     res.status(500).json({ error: "Could not clear chat." });
   }
+});
+
+// Music search endpoint
+app.get("/api/music/search", async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.status(400).json({ error: "Query is required" });
+  
+  const videoId = await searchYoutubeVideo(q);
+  if (!videoId) return res.status(404).json({ error: "Music not found" });
+  
+  res.json({ videoId });
 });
 
 // Health check
