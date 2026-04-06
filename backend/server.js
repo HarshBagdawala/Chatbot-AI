@@ -634,7 +634,7 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
     return res.status(400).json({ error: "At least one image is required" });
   }
 
-  const { size = 'landscape' } = req.body;
+  const { size = 'landscape', prompt = '' } = req.body;
   const bannerName = `banner-${Date.now()}.png`;
   const bannerPath = path.join(__dirname, "uploads", bannerName);
 
@@ -645,19 +645,38 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
     const imageFiles = req.files;
     let targetWidth, targetHeight;
 
-    // Determine proportions based on user choice
+    // Determine proportions
     if (size === 'square') {
       targetWidth = 1080; targetHeight = 1080;
     } else if (size === 'portrait') {
       targetWidth = 1080; targetHeight = 1920;
-    } else { // default landscape
+    } else { 
       targetWidth = 1920; targetHeight = 1080;
     }
 
     const imageWidth = Math.floor(targetWidth / imageFiles.length);
     const imageHeight = targetHeight;
 
-    // Process and resize each image
+    // 1. Generate Smart Caption with AI
+    let smartCaption = "";
+    if (prompt) {
+      try {
+        const aiResponse = await groq.chat.completions.create({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            { role: "system", content: "You are a creative poster designer. Generate a short, punchy, and professional title or caption based on the user's prompt. Return ONLY the text, maximum 5-8 words. No quotes." },
+            { role: "user", content: `Create a title for: ${prompt}` }
+          ],
+          max_tokens: 50
+        });
+        smartCaption = aiResponse.choices[0]?.message?.content?.trim() || prompt;
+      } catch (aiErr) {
+        console.error("AI Caption Error:", aiErr);
+        smartCaption = prompt; // Fallback to raw prompt
+      }
+    }
+
+    // 2. Process and resize each image
     const processedImages = await Promise.all(
       imageFiles.map(async (file, index) => {
         const inputBuffer = fs.readFileSync(file.path);
@@ -673,7 +692,31 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
       })
     );
 
-    // Create the final composite banner
+    // 3. Create SVG Text Overlay
+    if (smartCaption) {
+      const fontSize = Math.floor(targetHeight * 0.08); // Responsive font size
+      const svgText = `
+        <svg width="${targetWidth}" height="${targetHeight}">
+          <style>
+            .title { 
+              fill: white; 
+              font-size: ${fontSize}px; 
+              font-weight: bold; 
+              font-family: 'Sora', sans-serif;
+              filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.8));
+            }
+          </style>
+          <text x="50%" y="90%" text-anchor="middle" class="title">${smartCaption}</text>
+        </svg>
+      `;
+      processedImages.push({
+        input: Buffer.from(svgText),
+        top: 0,
+        left: 0
+      });
+    }
+
+    // 4. Create final composite
     await sharp({
       create: {
         width: targetWidth,
@@ -686,16 +729,14 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
     .png()
     .toFile(bannerPath);
 
-    // Cleanup: Delete original uploaded files
+    // Cleanup
     imageFiles.forEach(f => fs.unlinkSync(f.path));
 
-    const bannerUrl = `/uploads/${bannerName}`;
-    res.json({ success: true, bannerUrl });
+    res.json({ success: true, bannerUrl: `/uploads/${bannerName}` });
 
   } catch (err) {
     console.error("Banner creation error:", err.message);
-    res.status(500).json({ error: "Failed to create banner. Please try again." });
-    // Cleanup on error
+    res.status(500).json({ error: "Failed to create banner." });
     if (req.files) req.files.forEach(f => { if(fs.existsSync(f.path)) fs.unlinkSync(f.path); });
   }
 });

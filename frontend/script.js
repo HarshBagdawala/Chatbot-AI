@@ -751,6 +751,7 @@ function handleImageSelection(event) {
 function closeBannerModal() {
   document.getElementById('bannerModal').classList.remove('active');
   document.getElementById('imageUploadInput').value = '';
+  if(document.getElementById('bannerPrompt')) document.getElementById('bannerPrompt').value = '';
   selectedFiles = [];
 }
 
@@ -758,17 +759,27 @@ async function createBanner() {
   if (selectedFiles.length === 0) return;
   
   const size = document.querySelector('input[name="bannerSize"]:checked').value;
+  const prompt = document.getElementById('bannerPrompt')?.value.trim() || '';
   const filesToUpload = [...selectedFiles]; // Capture files before modal clears them
   
+  if (filesToUpload.length === 0) {
+    showToast("⚠️ No images selected.");
+    return;
+  }
+
   closeBannerModal();
   
   // UI Feedback
-  appendMessage('user', `Creating a ${size} banner with ${filesToUpload.length} images... 🛠️`);
+  appendMessage('user', `Designing a ${size} banner with ${filesToUpload.length} images... 🛠️`);
   showTyping();
   
   const formData = new FormData();
-  filesToUpload.forEach(file => formData.append('images', file));
+  // Using file.name to ensure standard multipart format for multer
+  filesToUpload.forEach((file, index) => {
+    formData.append('images', file, file.name);
+  });
   formData.append('size', size);
+  formData.append('prompt', prompt);
   
   try {
     const res = await fetch('/api/banner/create', {
@@ -782,8 +793,7 @@ async function createBanner() {
     if (!res.ok) throw new Error(data.error || "Upload failed");
     
     // Display the banner using the same tag format as AI Image Gen
-    // This allows it to reuse the existing premium image rendering logic
-    const bannerMessage = `✨ **Your Smart Banner is ready!** [IMAGE_GEN: ${window.location.origin}${data.bannerUrl}]`;
+    const bannerMessage = `✨ **Your AI Banner is ready!** [IMAGE_GEN: ${window.location.origin}${data.bannerUrl}]`;
     appendMessage('assistant', bannerMessage);
     showToast("✅ Banner Created!");
     
