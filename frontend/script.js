@@ -528,6 +528,7 @@ function onYouTubeIframeAPIReady() {
       controls: 0,
       disablekb: 1,
       fs: 0,
+      origin: window.location.origin,
     },
     events: {
       'onReady': onPlayerReady,
@@ -576,7 +577,14 @@ async function playMusicCommand(songName) {
     }
 
     if(musicTitle) musicTitle.textContent = songName;
+    ytPlayer.unMute();
     ytPlayer.loadVideoById(data.videoId);
+    // Explicitly call play if it doesn't start
+    setTimeout(() => {
+      if (ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
+        ytPlayer.playVideo();
+      }
+    }, 1000);
     showToast('🎵 Playing: ' + songName);
   } catch (err) {
     showToast('❌ ' + err.message);
