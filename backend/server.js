@@ -84,20 +84,48 @@ async function performWebSearch(query) {
 
 async function searchYoutubeVideo(query) {
   try {
-    const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent("site:youtube.com " + query)}`;
+    // Strategy 1: Search DuckDuckGo specifically for video links
+    const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent("youtube " + query)}`;
     const response = await fetch(searchUrl, {
       method: "GET",
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
       }
     });
 
     if (!response.ok) return null;
     
     const html = await response.text();
-    // Look for watch?v=XXXXXXX
-    const match = html.match(/watch\?v=([a-zA-Z0-9_-]{11})/);
-    return match ? match[1] : null;
+    
+    // Multiple regex patterns for video IDs
+    const patterns = [
+      /watch\?v=([a-zA-Z0-9_-]{11})/,
+      /video\/([a-zA-Z0-9_-]{11})/,
+      /v=([a-zA-Z0-9_-]{11})/,
+      /vi\/([a-zA-Z0-9_-]{11})/
+    ];
+
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) return match[1];
+    }
+
+    // Strategy 2: Try another search if first one fails
+    const searchUrl2 = `https://html.duckduckgo.com/html/?q=${encodeURIComponent("site:youtube.com " + query)}`;
+    const response2 = await fetch(searchUrl2, {
+      method: "GET",
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    
+    if (response2.ok) {
+        const html2 = await response2.text();
+        const match2 = html2.match(/watch\?v=([a-zA-Z0-9_-]{11})/);
+        if (match2) return match2[1];
+    }
+
+    console.warn(`[Music Search] Could not find video ID for: ${query}. HTML snippet: ${html.substring(0, 300)}`);
+    return null;
   } catch (err) {
     console.error("YouTube search failed:", err.message);
     return null;
