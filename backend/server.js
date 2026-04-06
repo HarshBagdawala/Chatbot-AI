@@ -1,14 +1,46 @@
 const path = require("path");
+const fs = require("fs");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 const express = require("express");
 const cors = require("cors");
+const multer = require("multer");
+const sharp = require("sharp");
 const { createClient } = require("@supabase/supabase-js");
 const Groq = require("groq-sdk");
 const { v4: uuidv4 } = require("uuid");
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "..", "frontend")));
+
+// ─── Multer Setup ────────────────────────────────────────────────────────────
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, "uploads");
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${uuidv4()}${path.extname(file.originalname)}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG, PNG and WebP images are allowed"));
+    }
+  },
+});
+
+// Serve uploaded files statically
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ─── Clients ────────────────────────────────────────────────────────────────
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -594,6 +626,78 @@ app.get("/api/music/search", async (req, res) => {
   res.json({ videoId });
 });
 */
+
+// ─── Banner Creation Route ──────────────────────────────────────────────────
+app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ error: "At least one image is required" });
+  }
+
+  const { size = 'landscape' } = req.body;
+  const bannerName = `banner-${Date.now()}.png`;
+  const bannerPath = path.join(__dirname, "uploads", bannerName);
+
+  try {
+    const bannersDir = path.join(__dirname, "uploads");
+    if (!fs.existsSync(bannersDir)) fs.mkdirSync(bannersDir);
+
+    const imageFiles = req.files;
+    let targetWidth, targetHeight;
+
+    // Determine proportions based on user choice
+    if (size === 'square') {
+      targetWidth = 1080; targetHeight = 1080;
+    } else if (size === 'portrait') {
+      targetWidth = 1080; targetHeight = 1920;
+    } else { // default landscape
+      targetWidth = 1920; targetHeight = 1080;
+    }
+
+    const imageWidth = Math.floor(targetWidth / imageFiles.length);
+    const imageHeight = targetHeight;
+
+    // Process and resize each image
+    const processedImages = await Promise.all(
+      imageFiles.map(async (file, index) => {
+        const inputBuffer = fs.readFileSync(file.path);
+        const resizedBuffer = await sharp(inputBuffer)
+          .resize(imageWidth, imageHeight, { fit: 'cover' })
+          .toBuffer();
+        
+        return {
+          input: resizedBuffer,
+          top: 0,
+          left: index * imageWidth
+        };
+      })
+    );
+
+    // Create the final composite banner
+    await sharp({
+      create: {
+        width: targetWidth,
+        height: targetHeight,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 }
+      }
+    })
+    .composite(processedImages)
+    .png()
+    .toFile(bannerPath);
+
+    // Cleanup: Delete original uploaded files
+    imageFiles.forEach(f => fs.unlinkSync(f.path));
+
+    const bannerUrl = `/uploads/${bannerName}`;
+    res.json({ success: true, bannerUrl });
+
+  } catch (err) {
+    console.error("Banner creation error:", err.message);
+    res.status(500).json({ error: "Failed to create banner. Please try again." });
+    // Cleanup on error
+    if (req.files) req.files.forEach(f => { if(fs.existsSync(f.path)) fs.unlinkSync(f.path); });
+  }
+});
 
 // Health check
 app.get("/api/health", (req, res) => {

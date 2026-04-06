@@ -730,3 +730,64 @@ function closeMusic() {
   if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
   if (musicPlayerContainer) musicPlayerContainer.classList.add('disabled');
 }
+
+// ─── Smart Banner Maker Logic ────────────────────────────────────────────────
+let selectedFiles = [];
+
+function handleImageSelection(event) {
+  const files = Array.from(event.target.files);
+  if (files.length === 0) return;
+  
+  if (files.length > 5) {
+    showToast("⚠️ Maximum 5 images allowed.");
+    event.target.value = '';
+    return;
+  }
+  
+  selectedFiles = files;
+  document.getElementById('bannerModal').classList.add('active');
+}
+
+function closeBannerModal() {
+  document.getElementById('bannerModal').classList.remove('active');
+  document.getElementById('imageUploadInput').value = '';
+  selectedFiles = [];
+}
+
+async function createBanner() {
+  if (selectedFiles.length === 0) return;
+  
+  const size = document.querySelector('input[name="bannerSize"]:checked').value;
+  closeBannerModal();
+  
+  // UI Feedback
+  appendMessage('user', `Creating a ${size} banner with ${selectedFiles.length} images... 🛠️`);
+  showTyping();
+  
+  const formData = new FormData();
+  selectedFiles.forEach(file => formData.append('images', file));
+  formData.append('size', size);
+  
+  try {
+    const res = await fetch('/api/banner/create', {
+      method: 'POST',
+      body: formData
+    });
+    
+    const data = await res.json();
+    hideTyping();
+    
+    if (!res.ok) throw new Error(data.error || "Upload failed");
+    
+    // Display the banner using the same tag format as AI Image Gen
+    // This allows it to reuse the existing premium image rendering logic
+    const bannerMessage = `✨ **Your Smart Banner is ready!** [IMAGE_GEN: ${window.location.origin}${data.bannerUrl}]`;
+    appendMessage('assistant', bannerMessage);
+    showToast("✅ Banner Created!");
+    
+  } catch (err) {
+    hideTyping();
+    showToast("❌ " + err.message);
+    console.error("Banner create error:", err);
+  }
+}
