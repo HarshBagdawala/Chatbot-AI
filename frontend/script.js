@@ -277,7 +277,23 @@ function appendMessage(role, content) {
   // 1. Extract Triple Backtick Blocks (Code Blocks)
   formatted = formatted.replace(/```([\s\S]*?)```/g, (match, code) => {
     const id = `__BLOCK_${blocks.length}__`;
-    blocks.push(`<pre><code>${code.trim()}</code></pre>`);
+    const escapedCode = code.trim()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    blocks.push(`
+      <div class="code-block-wrapper">
+        <button class="copy-btn" onclick="copyToClipboard(this)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span>Copy</span>
+        </button>
+        <pre><code>${escapedCode}</code></pre>
+      </div>
+    `);
     return id;
   });
 
@@ -507,6 +523,35 @@ async function clearChat() {
 
   startNewChat();
 }
+
+/**
+ * Copy code from block to clipboard
+ */
+window.copyToClipboard = (btn) => {
+  const wrapper = btn.closest('.code-block-wrapper');
+  const code = wrapper.querySelector('code').innerText;
+  
+  navigator.clipboard.writeText(code).then(() => {
+    const btnText = btn.querySelector('span');
+    const originalHTML = btn.innerHTML;
+    
+    btn.classList.add('copied');
+    btn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      <span>Copied!</span>
+    `;
+    
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = originalHTML;
+    }, 2000);
+  }).catch(err => {
+    console.error('Failed to copy: ', err);
+    showToast('❌ Copy failed');
+  });
+};
 
 // Initialize
 checkAuth();
