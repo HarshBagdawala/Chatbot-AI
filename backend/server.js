@@ -82,7 +82,64 @@ async function performWebSearch(query) {
   }
 }
 
+/*
+async function searchYoutubeOfficial(query) {
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey || apiKey.includes('your_youtube_api_key_here')) return null;
+
+  try {
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&key=${apiKey}&maxResults=1&type=video`;
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.items && data.items.length > 0) {
+      console.log(`[Music Search] Found official video ID: ${data.items[0].id.videoId}`);
+      return data.items[0].id.videoId;
+    }
+    return null;
+  } catch (err) {
+    console.error("Official YouTube search failed:", err.message);
+    return null;
+  }
+}
+
+async function searchInvidious(query) {
+  // Rotate through stable public instances
+  const instances = [
+    'https://iv.melmac.space',
+    'https://invidious.flokinet.to',
+    'https://invidious.projectsegfau.lt',
+    'https://invidious.perennialte.ch'
+  ];
+
+  for (const instance of instances) {
+    try {
+      const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
+      const response = await fetch(url, { signal: AbortSignal.timeout(3000) }); // 3s timeout
+      if (!response.ok) continue;
+      
+      const data = await response.json();
+      if (data && data.length > 0 && data[0].videoId) {
+        console.log(`[Music Search] Found Invidious video ID (${instance}): ${data[0].videoId}`);
+        return data[0].videoId;
+      }
+    } catch (err) {
+      continue; // Try next instance
+    }
+  }
+  return null;
+}
+
 async function searchYoutubeVideo(query) {
+  // 1. Try Official API first
+  const officialId = await searchYoutubeOfficial(query);
+  if (officialId) return officialId;
+
+  // 2. Try Invidious (Key-less & Reliable fallback)
+  const invidiousId = await searchInvidious(query);
+  if (invidiousId) return invidiousId;
+
+  // 3. Fallback to Scraper (Local dev fallback)
   try {
     // Strategy 1: Search DuckDuckGo specifically for video links
     const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent("youtube " + query)}`;
@@ -131,6 +188,7 @@ async function searchYoutubeVideo(query) {
     return null;
   }
 }
+*/
 
 
 // ─── Weather API (OpenWeatherMap) ───────────────────────────────────────────
@@ -500,6 +558,7 @@ app.delete("/api/history/:session_id", async (req, res) => {
   }
 });
 
+/*
 // Music search endpoint
 app.get("/api/music/search", async (req, res) => {
   const { q } = req.query;
@@ -510,6 +569,7 @@ app.get("/api/music/search", async (req, res) => {
   
   res.json({ videoId });
 });
+*/
 
 // Health check
 app.get("/api/health", (req, res) => {
