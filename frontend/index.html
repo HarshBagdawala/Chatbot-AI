@@ -83,6 +83,33 @@
           </div>
         </div>
         <div class="header-actions">
+          <div class="theme-selector">
+            <button class="btn-theme-toggle" id="themeBtn" title="Change Theme">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 2a10 10 0 0 0-10 10c0 5.52 4.48 10 10 10s10-4.48 10-10"></path>
+                <path d="M12 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm4 2a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm2 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm-2 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm-4 2a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"></path>
+              </svg>
+            </button>
+            <div class="theme-menu" id="themeMenu">
+              <div class="theme-option active" data-theme="emerald">
+                <div class="theme-circle emerald"></div>
+                <span>Emerald (Dark)</span>
+              </div>
+              <div class="theme-option" data-theme="light">
+                <div class="theme-circle light"></div>
+                <span>Light Mode</span>
+              </div>
+              <div class="theme-option" data-theme="pink">
+                <div class="theme-circle pink"></div>
+                <span>Neon Pink</span>
+              </div>
+              <div class="theme-option" data-theme="blue">
+                <div class="theme-circle blue"></div>
+                <span>Ocean Blue</span>
+              </div>
+            </div>
+          </div>
           <button class="btn-logout" id="headerLogoutBtn" onclick="handleLogout()" title="Logout">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -97,6 +124,7 @@
             </svg>
           </button>
         </div>
+
       </header>
 
       <!-- Chat Area -->

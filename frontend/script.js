@@ -553,8 +553,57 @@ window.copyToClipboard = (btn) => {
   });
 };
 
+/**
+ * Theme Management
+ */
+const themeBtn = document.getElementById('themeBtn');
+const themeMenu = document.getElementById('themeMenu');
+const themeOptions = document.querySelectorAll('.theme-option');
+
+function toggleThemeMenu(e) {
+  e.stopPropagation();
+  themeMenu.classList.toggle('show');
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('chat_theme', theme);
+  
+  // Update active state in menu
+  themeOptions.forEach(opt => {
+    if (opt.dataset.theme === theme) {
+      opt.classList.add('active');
+    } else {
+      opt.classList.remove('active');
+    }
+  });
+}
+
+if (themeBtn) {
+  themeBtn.onclick = toggleThemeMenu;
+}
+
+themeOptions.forEach(opt => {
+  opt.onclick = () => {
+    setTheme(opt.dataset.theme);
+    themeMenu.classList.remove('show');
+  };
+});
+
+// Close menu on outside click
+document.addEventListener('click', (e) => {
+  if (themeMenu && !themeMenu.contains(e.target) && e.target !== themeBtn) {
+    themeMenu.classList.remove('show');
+  }
+});
+
+// Initialize Theme
+const savedTheme = localStorage.getItem('chat_theme') || 'emerald';
+setTheme(savedTheme);
+
 // Initialize
 checkAuth();
+
 
 // ─── Music Player Setup (YouTube IFrame API) ─────────────────────────────────
 let ytPlayer;
