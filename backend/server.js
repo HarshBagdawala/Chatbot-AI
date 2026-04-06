@@ -629,6 +629,7 @@ app.get("/api/music/search", async (req, res) => {
 
 // ─── Banner Creation Route ──────────────────────────────────────────────────
 app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
+  console.log(`[Banner Creator] Received ${req.files ? req.files.length : 0} images with size: ${req.body.size}`);
   if (!req.files || req.files.length === 0) {
     return res.status(400).json({ error: "At least one image is required" });
   }

@@ -758,14 +758,16 @@ async function createBanner() {
   if (selectedFiles.length === 0) return;
   
   const size = document.querySelector('input[name="bannerSize"]:checked').value;
+  const filesToUpload = [...selectedFiles]; // Capture files before modal clears them
+  
   closeBannerModal();
   
   // UI Feedback
-  appendMessage('user', `Creating a ${size} banner with ${selectedFiles.length} images... 🛠️`);
+  appendMessage('user', `Creating a ${size} banner with ${filesToUpload.length} images... 🛠️`);
   showTyping();
   
   const formData = new FormData();
-  selectedFiles.forEach(file => formData.append('images', file));
+  filesToUpload.forEach(file => formData.append('images', file));
   formData.append('size', size);
   
   try {
