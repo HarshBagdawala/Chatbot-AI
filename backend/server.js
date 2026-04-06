@@ -261,6 +261,7 @@ Key behavior rules:
 5. MUSIC REQUESTS: If the user asks you to play a song or music (e.g., "play some music", "play Believer by Imagine Dragons"), you MUST include exactly this tag in your response: \`[PLAY_MUSIC: song_name]\` (replace song_name with the requested song title, or "Relaxing Lofi Music" if no specific song is requested). 🎵
 6. WEATHER: For ANY questions about weather, temperature, or forecasts for ANY city, region, or country globally, you MUST use the 'get_weather' tool. Do NOT guess or use old data. 🌦️
 7. WEB SEARCH: For other real-time news or general facts, use 'search_web'. 🔍
+8. IMAGE GENERATION: If the user asks to "generate", "create", "draw", or "make" an image, use the 'generate_image' tool. After the tool returns a URL, you MUST include the tag \`[IMAGE_GEN: url]\` in your final response to display it. 🎨
 
 You can help with: coding, science, history, general knowledge, math, creative writing, advice, and much more!`;
 
@@ -387,6 +388,23 @@ app.post("/api/chat", async (req, res) => {
           },
         },
       },
+      {
+        type: "function",
+        function: {
+          name: "generate_image",
+          description: "Generate a high-quality AI image from a text description.",
+          parameters: {
+            type: "object",
+            properties: {
+              prompt: {
+                type: "string",
+                description: "The detailed English description of the image to generate (e.g. 'A futuristic city at sunset').",
+              },
+            },
+            required: ["prompt"],
+          },
+        },
+      },
     ];
 
     // 3. Call Groq API
@@ -420,6 +438,12 @@ app.post("/api/chat", async (req, res) => {
         } else if (toolCall.function.name === 'get_weather') {
           const args = JSON.parse(toolCall.function.arguments);
           toolResults = await getWeatherData(args.city);
+        } else if (toolCall.function.name === 'generate_image') {
+          const args = JSON.parse(toolCall.function.arguments);
+          const randomSeed = Math.floor(Math.random() * 1000000);
+          const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(args.prompt)}?width=1024&height=1024&nologo=true&seed=${randomSeed}`;
+          toolResults = `Successfully generated the image. Tell the user you've created it and MUST include this exact tag in your response: [IMAGE_GEN: ${imageUrl}]`;
+          console.log(`Generated Image URL: ${imageUrl}`);
         }
         
         messages.push({

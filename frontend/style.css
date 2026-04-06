@@ -1275,4 +1275,75 @@ header {
 .btn-logout-small svg {
   width: 18px;
   height: 18px;
+}@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap');
+
+/*  AI Generated Image  */
+.generated-image-card {
+  margin-top: 15px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  position: relative;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  width: 100%;
+}
+
+.generated-image-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--accent);
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5), 0 0 20px var(--accent-glow);
+}
+
+.image-loading-skeleton {
+  width: 100%;
+  aspect-ratio: 1/1;
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface2) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: skeletonPulse 1.5s infinite linear;
+}
+
+@keyframes skeletonPulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.generated-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+.image-actions {
+  padding: 12px;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+}
+
+.download-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--accent);
+  color: #030712;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s;
+}
+
+.download-btn:hover {
+  filter: brightness(1.1);
+  transform: scale(1.05);
+}
+
+.download-btn svg {
+  stroke: #030712;
 }

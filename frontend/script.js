@@ -308,12 +308,43 @@ function appendMessage(role, content) {
   blocks.forEach((block, i) => {
     formatted = formatted.replace(`__BLOCK_${i}__`, block);
   });
+
+  // 4. Handle [IMAGE_GEN: url]
+  const imageMatch = formatted.match(/\[IMAGE_GEN:\s*(.*?)\]/i);
+  let imageHTML = '';
+  if (imageMatch) {
+    const imageUrl = imageMatch[1].trim();
+    formatted = formatted.replace(/\[IMAGE_GEN:.*?\]/gi, '').trim();
+    
+    const randomId = 'img_' + Math.random().toString(36).substr(2, 9);
+    imageHTML = `
+      <div class="generated-image-card">
+        <div class="image-loading-skeleton" id="skeleton_${randomId}"></div>
+        <img src="${imageUrl}" 
+             alt="AI Generated" 
+             class="generated-image" 
+             onload="document.getElementById('skeleton_${randomId}').style.display='none'; this.style.opacity='1'"
+             onerror="this.src='https://via.placeholder.com/512?text=Image+Load+Failed'; document.getElementById('skeleton_${randomId}').style.display='none'">
+        <div class="image-actions">
+          <a href="${imageUrl}" download="ai-generated-image.png" target="_blank" class="download-btn">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Save Image
+          </a>
+        </div>
+      </div>
+    `;
+    if (!formatted) formatted = "I've generated this image for you: 🎨";
+  }
   // ────────────────────────────────────────
 
   div.innerHTML = `
     <div class="avatar">${avatar}</div>
     <div>
-      <div class="bubble">${formatted}</div>
+      <div class="bubble">${formatted}${imageHTML}</div>
       <div class="time">${getTime()}</div>
     </div>
   `;
