@@ -265,6 +265,190 @@ async function getWeatherData(city) {
   }
 }
 
+// ─── HTML Page Generator ──────────────────────────────────────────────────────
+function generateHTMLPage(pageTitle = "My Page", bodyContent = "") {
+  const defaultContent = bodyContent || `
+    <h1>Welcome to ${pageTitle}</h1>
+    <p>This is a basic webpage with header, body, and footer sections.</p>
+    <ul>
+      <li>Point 1: Easy to customize</li>
+      <li>Point 2: Responsive design</li>
+      <li>Point 3: Clean structure</li>
+    </ul>
+  `;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${pageTitle}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        nav {
+            background-color: #333;
+            padding: 1rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        
+        nav ul {
+            list-style: none;
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+        
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        
+        nav a:hover {
+            color: #667eea;
+        }
+        
+        main {
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.05);
+            padding: 2rem;
+            min-height: 400px;
+        }
+        
+        main h1 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            font-size: 2rem;
+        }
+        
+        main p {
+            margin-bottom: 1rem;
+            color: #555;
+        }
+        
+        main ul {
+            margin-left: 2rem;
+            margin-bottom: 1rem;
+        }
+        
+        main li {
+            margin-bottom: 0.5rem;
+            color: #555;
+        }
+        
+        footer {
+            background-color: #333;
+            color: white;
+            text-align: center;
+            padding: 2rem 1rem;
+            margin-top: 2rem;
+            border-top: 4px solid #667eea;
+        }
+        
+        footer p {
+            margin-bottom: 0.5rem;
+        }
+        
+        footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        footer a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.8rem;
+            }
+            
+            nav ul {
+                gap: 1rem;
+                flex-direction: column;
+            }
+            
+            main {
+                margin: 1rem auto;
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>${pageTitle}</h1>
+        <p>✨ A modern and responsive webpage</p>
+    </header>
+    
+    <nav>
+        <ul>
+            <li><a href="#home">Home</a></li>
+            <li><a href="#about">About</a></li>
+            <li><a href="#services">Services</a></li>
+            <li><a href="#contact">Contact</a></li>
+        </ul>
+    </nav>
+    
+    <main>
+        ${defaultContent}
+    </main>
+    
+    <footer>
+        <p>&copy; 2025 ${pageTitle}. All rights reserved.</p>
+        <p>Created with <span style="color: red;">❤️</span> | <a href="#">Privacy Policy</a></p>
+    </footer>
+</body>
+</html>`;
+}
+
+function isHTMLPageRequest(message) {
+  const htmlKeywords = [
+    'html page', 'full page', 'basic page', 'html code',
+    'create page', 'make page', 'web page', 'html template',
+    'design page', 'build page', 'webpage code'
+  ];
+  
+  const lowerMessage = message.toLowerCase();
+  return htmlKeywords.some(keyword => lowerMessage.includes(keyword));
+}
+
 // ─── System Prompt ───────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are a helpful, knowledgeable, and friendly AI assistant.
 
@@ -354,6 +538,39 @@ app.post("/api/chat", async (req, res) => {
   const sessionId = session_id || `${userPrefix}${uuidv4()}`;
 
   try {
+    // Check if user is asking for HTML page
+    if (isHTMLPageRequest(message)) {
+      const htmlCode = generateHTMLPage();
+      const assistantReply = `🎨 **Here's a complete HTML page for you!**\n\nI've created a beautiful, responsive webpage with:\n✅ **Header** - Eye-catching title section\n✅ **Navigation** - Menu bar with links\n✅ **Body** - Main content area\n✅ **Footer** - Footer section with credits\n✅ **Styling** - Modern CSS with gradients and responsive design\n✅ **Mobile Friendly** - Works on all devices\n\nYou can copy this code and customize it with your own content, colors, and text!\n\n\`\`\`html\n${htmlCode}\n\`\`\``;
+
+      // Save to Supabase if not guest
+      if (username !== 'guest') {
+        const { error: insertError } = await supabase
+          .from("chat_messages")
+          .insert([
+            {
+              session_id: sessionId,
+              role: "user",
+              content: message,
+            },
+            {
+              session_id: sessionId,
+              role: "assistant",
+              content: assistantReply,
+            },
+          ]);
+
+        if (insertError) {
+          console.error("Supabase insert error:", insertError.message);
+        }
+      }
+
+      return res.json({
+        reply: assistantReply,
+        session_id: sessionId,
+      });
+    }
+
     // 1. Fetch last 10 messages for context from Supabase
     const { data: history, error: historyError } = await supabase
       .from("chat_messages")

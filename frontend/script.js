@@ -596,6 +596,19 @@ function showWelcome() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ─── Image Upload Detection ───────────────────────────────────────────────────
+
+function isImageUploadRequest(message) {
+  const uploadKeywords = [
+    'upload', 'image', 'photo', 'picture', 'collage', 'banner',
+    'attach', 'select image', 'choose image', 'create collage',
+    'make collage', 'merge image', 'combine image', 'build banner',
+    'design banner', 'select photo', 'choose photo'
+  ];
+  
+  const lowerMessage = message.toLowerCase();
+  return uploadKeywords.some(keyword => lowerMessage.includes(keyword));
+}
 
 async function sendMessage(isVoice = false) {
   const msg = userInput.value.trim();
@@ -608,6 +621,16 @@ async function sendMessage(isVoice = false) {
   sendBtn.disabled = true;
 
   appendMessage('user', msg);
+  
+  // Check if user is asking to upload/create images
+  if (isImageUploadRequest(msg)) {
+    showToast('📸 Click the attachment button or select images!');
+    document.getElementById('imageUploadInput').click();
+    sendBtn.disabled = false;
+    userInput.focus();
+    return;
+  }
+
   showTyping();
 
   try {
