@@ -651,6 +651,57 @@ header {
   text-align: right;
 }
 
+.edit-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  margin-top: 6px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.edit-btn:hover {
+  opacity: 1;
+}
+
+.edit-textarea {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.6;
+  padding: 8px;
+  width: 100%;
+}
+
+.edit-save-btn, .edit-cancel-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  margin: 4px;
+  padding: 4px 8px;
+  transition: background 0.2s;
+}
+
+.edit-save-btn:hover {
+  background: var(--accent2);
+}
+
+.edit-cancel-btn {
+  background: var(--danger);
+}
+
+.edit-cancel-btn:hover {
+  background: #dc2626;
+}
+
 /* ── Input Area ── */
 .input-area {
   padding: 24px 32px 32px;

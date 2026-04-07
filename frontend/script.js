@@ -1,5 +1,6 @@
 let sessionId = localStorage.getItem('chat_session_id') || null;
 let currentUsername = localStorage.getItem('chat_username') || null;
+let messageIndex = 0;
 
 const chatBox = document.getElementById('chatBox');
 const userInput = document.getElementById('userInput');
@@ -267,6 +268,7 @@ function appendMessage(role, content) {
   hideWelcome();
   const div = document.createElement('div');
   div.className = `message ${role}`;
+  div.setAttribute('data-index', messageIndex++);
 
   const avatar = role === 'user' ? '👤' : '🤖';
 
@@ -346,11 +348,127 @@ function appendMessage(role, content) {
     <div>
       <div class="bubble">${formatted}${imageHTML}</div>
       <div class="time">${getTime()}</div>
+      ${role === 'user' ? '<button class="edit-btn" onclick="editMessage(this)">✏️</button>' : ''}
     </div>
   `;
   chatBox.appendChild(div);
   chatBox.scrollTop = chatBox.scrollHeight;
   return div;
+}
+
+function editMessage(btn) {
+  const messageDiv = btn.closest('.message');
+  const bubble = messageDiv.querySelector('.bubble');
+  const originalContent = bubble.innerHTML;
+  const textarea = document.createElement('textarea');
+  textarea.value = bubble.textContent; // Get plain text for editing
+  textarea.className = 'edit-textarea';
+  textarea.style.width = '100%';
+  textarea.style.minHeight = '60px';
+  textarea.style.resize = 'vertical';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Save';
+  saveBtn.className = 'edit-save-btn';
+  saveBtn.onclick = () => saveEdit(messageDiv, textarea.value);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.className = 'edit-cancel-btn';
+  cancelBtn.onclick = () => cancelEdit(messageDiv, originalContent);
+
+  bubble.innerHTML = '';
+  bubble.appendChild(textarea);
+  bubble.appendChild(saveBtn);
+  bubble.appendChild(cancelBtn);
+  textarea.focus();
+}
+
+function saveEdit(messageDiv, newContent) {
+  // Format the new content like appendMessage
+  let formatted = newContent;
+  const blocks = [];
+
+  // Extract Triple Backtick Blocks
+  formatted = formatted.replace(/```([\s\S]*?)```/g, (match, code) => {
+    const id = `__BLOCK_${blocks.length}__`;
+    const escapedCode = code.trim()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    blocks.push(`
+      <div class="code-block-wrapper">
+        <button class="copy-btn" onclick="copyToClipboard(this)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span>Copy</span>
+        </button>
+        <pre><code>${escapedCode}</code></pre>
+      </div>
+    `);
+    return id;
+  });
+
+  // Format the rest
+  formatted = formatted
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+
+  // Put Code Blocks back
+  blocks.forEach((block, i) => {
+    formatted = formatted.replace(`__BLOCK_${i}__`, block);
+  });
+
+  const bubble = messageDiv.querySelector('.bubble');
+  bubble.innerHTML = formatted;
+
+  // Remove subsequent messages
+  const currentIndex = parseInt(messageDiv.getAttribute('data-index'));
+  const allMessages = Array.from(chatBox.querySelectorAll('.message'));
+  allMessages.forEach(msg => {
+    if (parseInt(msg.getAttribute('data-index')) > currentIndex) {
+      msg.remove();
+    }
+  });
+
+  // Resend the message
+  sendEditedMessage(newContent);
+}
+
+function cancelEdit(messageDiv, originalContent) {
+  const bubble = messageDiv.querySelector('.bubble');
+  bubble.innerHTML = originalContent;
+}
+
+function sendEditedMessage(content) {
+  // Similar to sendMessage but with specific content
+  showTyping();
+  fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: content, session_id: sessionId, username: currentUsername })
+  })
+  .then(res => res.json())
+  .then(data => {
+    hideTyping();
+    if (data.error) {
+      showToast('❌ ' + data.error);
+      return;
+    }
+    sessionId = data.session_id;
+    localStorage.setItem('chat_session_id', sessionId);
+    appendMessage('assistant', data.reply);
+    if (currentUsername !== 'guest') loadSessions();
+  })
+  .catch(err => {
+    hideTyping();
+    showToast('❌ Network error');
+  });
 }
 
 function showTyping() {
@@ -417,6 +535,7 @@ async function loadHistory(id) {
     
     if (data.messages && data.messages.length > 0) {
       data.messages.forEach(m => appendMessage(m.role, m.content));
+      messageIndex = data.messages.length;
     } else {
       showWelcome();
     }
@@ -447,6 +566,7 @@ async function selectSession(id) {
 function startNewChat() {
   sessionId = null;
   localStorage.removeItem('chat_session_id');
+  messageIndex = 0;
   chatBox.innerHTML = '';
   showWelcome();
   loadSessions();
