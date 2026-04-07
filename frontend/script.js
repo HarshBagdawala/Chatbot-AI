@@ -345,10 +345,12 @@ function appendMessage(role, content) {
 
   div.innerHTML = `
     <div class="avatar">${avatar}</div>
-    <div>
-      <div class="bubble">${formatted}${imageHTML}</div>
+    <div class="message-body">
+      <div class="message-content">
+        ${role === 'user' ? '<button class="edit-btn" onclick="editMessage(this)">✏️</button>' : ''}
+        <div class="bubble">${formatted}${imageHTML}</div>
+      </div>
       <div class="time">${getTime()}</div>
-      ${role === 'user' ? '<button class="edit-btn" onclick="editMessage(this)">✏️</button>' : ''}
     </div>
   `;
   chatBox.appendChild(div);

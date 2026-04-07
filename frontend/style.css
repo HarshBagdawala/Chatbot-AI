@@ -596,6 +596,26 @@ header {
   margin-right: auto;
 }
 
+.message-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.message.user .message-body {
+  align-items: flex-end;
+}
+
+.message.assistant .message-body {
+  align-items: flex-start;
+}
+
+.message-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
 .avatar {
   width: 30px;
   height: 30px;
@@ -656,14 +676,16 @@ header {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 14px;
-  margin-top: 6px;
-  opacity: 0.7;
-  transition: opacity 0.2s;
+  font-size: 16px;
+  padding: 2px;
+  opacity: 0.8;
+  transition: opacity 0.2s, transform 0.2s;
+  align-self: center;
 }
 
 .edit-btn:hover {
   opacity: 1;
+  transform: scale(1.05);
 }
 
 .edit-textarea {
