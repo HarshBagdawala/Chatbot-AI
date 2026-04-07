@@ -745,13 +745,43 @@ function handleImageSelection(event) {
   }
   
   selectedFiles = files;
+  openBannerModal();
+}
+
+function openBannerModal() {
+  // Populate image preview thumbnails
+  const previewContainer = document.getElementById('bannerImagePreviews');
+  if (previewContainer) {
+    previewContainer.innerHTML = '';
+
+    // Count badge
+    const countBadge = document.createElement('div');
+    countBadge.className = 'banner-img-count';
+    countBadge.textContent = `${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''} selected`;
+    previewContainer.appendChild(countBadge);
+
+    // Thumbnails
+    selectedFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.className = 'banner-thumb';
+        img.title = file.name;
+        previewContainer.appendChild(img);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   document.getElementById('bannerModal').classList.add('active');
 }
 
 function closeBannerModal() {
   document.getElementById('bannerModal').classList.remove('active');
   document.getElementById('imageUploadInput').value = '';
-  if(document.getElementById('bannerPrompt')) document.getElementById('bannerPrompt').value = '';
+  const promptEl = document.getElementById('bannerPrompt');
+  if (promptEl) promptEl.value = '';
   selectedFiles = [];
 }
 
@@ -760,24 +790,19 @@ async function createBanner() {
   
   const size = document.querySelector('input[name="bannerSize"]:checked').value;
   const prompt = document.getElementById('bannerPrompt')?.value.trim() || '';
-  const filesToUpload = [...selectedFiles]; // Capture files before modal clears them
+  const filesToUpload = [...selectedFiles];
   
-  if (filesToUpload.length === 0) {
-    showToast("⚠️ No images selected.");
-    return;
-  }
+  const btn = document.getElementById('btnCreateBanner');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span>⏳ Creating…</span>'; }
 
   closeBannerModal();
   
-  // UI Feedback
-  appendMessage('user', `Designing a ${size} banner with ${filesToUpload.length} images... 🛠️`);
+  const sizeLabel = { landscape: 'Landscape 1920×1080', square: 'Square 1080×1080', portrait: 'Portrait 1080×1920' }[size] || size;
+  appendMessage('user', `🎨 Creating a **${sizeLabel}** collage with **${filesToUpload.length}** image${filesToUpload.length > 1 ? 's' : ''}${prompt ? ` — "${prompt}"` : ''}…`);
   showTyping();
   
   const formData = new FormData();
-  // Using file.name to ensure standard multipart format for multer
-  filesToUpload.forEach((file, index) => {
-    formData.append('images', file, file.name);
-  });
+  filesToUpload.forEach((file) => formData.append('images', file, file.name));
   formData.append('size', size);
   formData.append('prompt', prompt);
   
@@ -792,14 +817,18 @@ async function createBanner() {
     
     if (!res.ok) throw new Error(data.error || "Upload failed");
     
-    // Display the banner using the same tag format as AI Image Gen
-    const bannerMessage = `✨ **Your AI Banner is ready!** [IMAGE_GEN: ${window.location.origin}${data.bannerUrl}]`;
+    const bannerUrl = data.bannerUrl.startsWith('data:') ? data.bannerUrl : `${window.location.origin}${data.bannerUrl}`;
+    const bannerMessage = `✨ **Your premium collage is ready!** [IMAGE_GEN: ${bannerUrl}]`;
     appendMessage('assistant', bannerMessage);
-    showToast("✅ Banner Created!");
+    showToast("✅ Collage Created!");
     
   } catch (err) {
     hideTyping();
     showToast("❌ " + err.message);
     console.error("Banner create error:", err);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span>✨ Create Collage</span>'; }
   }
 }
+
+

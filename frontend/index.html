@@ -173,36 +173,58 @@
     </main>
   </div>
 
-  <!-- Banner Size Modal -->
+  <!-- Banner Creator Modal -->
   <div class="banner-modal" id="bannerModal">
     <div class="banner-modal-content">
-      <h3>Design Your Banner 🖼️</h3>
-      <p>Select a size and tell the AI what to write or style!</p>
-      
-      <div class="banner-prompt-container">
-        <textarea id="bannerPrompt" placeholder="E.g. Make a birthday banner, or 'Summer Vocations 2024'"></textarea>
+      <div class="banner-modal-header">
+        <div class="banner-modal-icon">🎨</div>
+        <h3>AI Collage Maker</h3>
+        <p>Your images will be merged into one stunning, premium collage</p>
       </div>
 
+      <!-- Image Previews -->
+      <div class="banner-image-previews" id="bannerImagePreviews"></div>
+
+      <!-- AI Prompt -->
+      <div class="banner-prompt-container">
+        <label class="banner-label">✨ Caption / Theme <span>(optional)</span></label>
+        <textarea id="bannerPrompt" placeholder="E.g. Summer Vibes 2025, Birthday Celebration, Travel Memories…"></textarea>
+      </div>
+
+      <!-- Size Options -->
+      <div class="banner-label">📐 Choose Canvas Size</div>
       <div class="size-options">
         <label class="size-card">
           <input type="radio" name="bannerSize" value="landscape" checked>
-          <div class="size-preview landscape"></div>
-          <span>Landscape (16:9)</span>
+          <div class="size-preview landscape">
+            <div class="size-icon">🖥️</div>
+          </div>
+          <span>Landscape</span>
+          <small>1920×1080</small>
         </label>
         <label class="size-card">
           <input type="radio" name="bannerSize" value="square">
-          <div class="size-preview square"></div>
-          <span>Square (1:1)</span>
+          <div class="size-preview square">
+            <div class="size-icon">⬛</div>
+          </div>
+          <span>Square</span>
+          <small>1080×1080</small>
         </label>
         <label class="size-card">
           <input type="radio" name="bannerSize" value="portrait">
-          <div class="size-preview portrait"></div>
-          <span>Portrait (9:16)</span>
+          <div class="size-preview portrait">
+            <div class="size-icon">📱</div>
+          </div>
+          <span>Portrait</span>
+          <small>1080×1920</small>
         </label>
       </div>
+
       <div class="modal-actions">
         <button class="btn-cancel" onclick="closeBannerModal()">Cancel</button>
-        <button class="btn-create" onclick="createBanner()">Create Banner</button>
+        <button class="btn-create" id="btnCreateBanner" onclick="createBanner()">
+          <span>✨ Create Collage</span>
+        </button>
       </div>
     </div>
   </div>

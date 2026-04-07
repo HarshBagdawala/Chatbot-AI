@@ -15,16 +15,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "..", "frontend")));
 
 // ─── Multer Setup ────────────────────────────────────────────────────────────
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, "uploads");
-    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${uuidv4()}${path.extname(file.originalname)}`);
-  },
-});
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -38,9 +29,6 @@ const upload = multer({
     }
   },
 });
-
-// Serve uploaded files statically
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ─── Clients ────────────────────────────────────────────────────────────────
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -635,109 +623,198 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
   }
 
   const { size = 'landscape', prompt = '' } = req.body;
-  const bannerName = `banner-${Date.now()}.png`;
-  const bannerPath = path.join(__dirname, "uploads", bannerName);
 
   try {
-    const bannersDir = path.join(__dirname, "uploads");
-    if (!fs.existsSync(bannersDir)) fs.mkdirSync(bannersDir);
-
     const imageFiles = req.files;
     let targetWidth, targetHeight;
 
-    // Determine proportions
-    if (size === 'square') {
-      targetWidth = 1080; targetHeight = 1080;
-    } else if (size === 'portrait') {
-      targetWidth = 1080; targetHeight = 1920;
-    } else { 
-      targetWidth = 1920; targetHeight = 1080;
-    }
+    if (size === 'square')        { targetWidth = 1080; targetHeight = 1080; }
+    else if (size === 'portrait') { targetWidth = 1080; targetHeight = 1920; }
+    else                          { targetWidth = 1920; targetHeight = 1080; } // landscape
 
-    const imageWidth = Math.floor(targetWidth / imageFiles.length);
-    const imageHeight = targetHeight;
+    const count = imageFiles.length;
 
-    // 1. Generate Smart Caption with AI
+    // ── 1. Generate AI Caption ──────────────────────────────────────────────────
     let smartCaption = "";
     if (prompt) {
       try {
         const aiResponse = await groq.chat.completions.create({
           model: "llama-3.3-70b-versatile",
           messages: [
-            { role: "system", content: "You are a creative poster designer. Generate a short, punchy, and professional title or caption based on the user's prompt. Return ONLY the text, maximum 5-8 words. No quotes." },
-            { role: "user", content: `Create a title for: ${prompt}` }
+            { role: "system", content: "You are a premium creative director. Generate ONE stunning, short, punchy title (max 6 words) for a collage banner based on the user's prompt. Return ONLY the text. No quotes, no punctuation at end." },
+            { role: "user", content: `Create a premium banner title for: ${prompt}` }
           ],
-          max_tokens: 50
+          max_tokens: 40
         });
         smartCaption = aiResponse.choices[0]?.message?.content?.trim() || prompt;
       } catch (aiErr) {
-        console.error("AI Caption Error:", aiErr);
-        smartCaption = prompt; // Fallback to raw prompt
+        console.error("AI Caption Error:", aiErr.message);
+        smartCaption = prompt;
       }
     }
 
-    // 2. Process and resize each image
-    const processedImages = await Promise.all(
-      imageFiles.map(async (file, index) => {
-        const inputBuffer = fs.readFileSync(file.path);
-        const resizedBuffer = await sharp(inputBuffer)
-          .resize(imageWidth, imageHeight, { fit: 'cover' })
-          .toBuffer();
-        
-        return {
-          input: resizedBuffer,
-          top: 0,
-          left: index * imageWidth
-        };
-      })
-    );
+    // ── 2. Smart Layout Selection ───────────────────────────────────────────────
+    // Layout: 1 image → full bleed | 2 → hero + sidebar | 3 → hero + 2 stack | 4+ → 2x grid
+    const compositeList = [];
 
-    // 3. Create SVG Text Overlay
+    if (count === 1) {
+      // Full bleed single image
+      const buf = await sharp(imageFiles[0].buffer)
+        .resize(targetWidth, targetHeight, { fit: 'cover', position: 'centre' })
+        .toBuffer();
+      compositeList.push({ input: buf, top: 0, left: 0 });
+
+    } else if (count === 2) {
+      // Hero (70%) + sidebar (30%)
+      const heroW = Math.floor(targetWidth * 0.68);
+      const sideW = targetWidth - heroW;
+
+      const hero = await sharp(imageFiles[0].buffer)
+        .resize(heroW, targetHeight, { fit: 'cover', position: 'centre' }).toBuffer();
+      const side = await sharp(imageFiles[1].buffer)
+        .resize(sideW, targetHeight, { fit: 'cover', position: 'centre' }).toBuffer();
+
+      compositeList.push({ input: hero, top: 0, left: 0 });
+      compositeList.push({ input: side, top: 0, left: heroW });
+
+      // Gradient divider between images
+      const divSvg = `<svg width="4" height="${targetHeight}">
+        <defs><linearGradient id="d" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="rgba(255,255,255,0.0)"/>
+          <stop offset="50%" stop-color="rgba(255,255,255,0.6)"/>
+          <stop offset="100%" stop-color="rgba(255,255,255,0.0)"/>
+        </linearGradient></defs>
+        <rect width="4" height="${targetHeight}" fill="url(#d)"/>
+      </svg>`;
+      compositeList.push({ input: Buffer.from(divSvg), top: 0, left: heroW - 2 });
+
+    } else if (count === 3) {
+      // Hero (60%) + 2 stacked on right (40%)
+      const heroW = Math.floor(targetWidth * 0.60);
+      const sideW = targetWidth - heroW;
+      const halfH = Math.floor(targetHeight / 2);
+
+      const hero  = await sharp(imageFiles[0].buffer).resize(heroW, targetHeight, { fit: 'cover', position: 'centre' }).toBuffer();
+      const top2  = await sharp(imageFiles[1].buffer).resize(sideW, halfH,       { fit: 'cover', position: 'centre' }).toBuffer();
+      const bot2  = await sharp(imageFiles[2].buffer).resize(sideW, targetHeight - halfH, { fit: 'cover', position: 'centre' }).toBuffer();
+
+      compositeList.push({ input: hero, top: 0, left: 0 });
+      compositeList.push({ input: top2, top: 0, left: heroW });
+      compositeList.push({ input: bot2, top: halfH, left: heroW });
+
+      // Vertical divider
+      const vDiv = `<svg width="4" height="${targetHeight}"><rect width="4" height="${targetHeight}" fill="rgba(255,255,255,0.4)"/></svg>`;
+      compositeList.push({ input: Buffer.from(vDiv), top: 0, left: heroW - 2 });
+      // Horizontal divider on sidebar
+      const hDiv = `<svg width="${sideW}" height="4"><rect width="${sideW}" height="4" fill="rgba(255,255,255,0.4)"/></svg>`;
+      compositeList.push({ input: Buffer.from(hDiv), top: halfH - 2, left: heroW });
+
+    } else {
+      // 4+ images: symmetric grid (max 4 used, 2 cols × 2 rows)
+      const usedFiles = imageFiles.slice(0, 4);
+      const cols = 2;
+      const rows = Math.ceil(usedFiles.length / cols);
+      const cellW = Math.floor(targetWidth / cols);
+      const cellH = Math.floor(targetHeight / rows);
+
+      for (let i = 0; i < usedFiles.length; i++) {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const buf = await sharp(usedFiles[i].buffer)
+          .resize(cellW, cellH, { fit: 'cover', position: 'centre' }).toBuffer();
+        compositeList.push({ input: buf, top: row * cellH, left: col * cellW });
+      }
+
+      // Grid lines
+      const hLine = `<svg width="${targetWidth}" height="4"><rect width="${targetWidth}" height="4" fill="rgba(255,255,255,0.35)"/></svg>`;
+      const vLine = `<svg width="4" height="${targetHeight}"><rect width="4" height="${targetHeight}" fill="rgba(255,255,255,0.35)"/></svg>`;
+      compositeList.push({ input: Buffer.from(hLine), top: Math.floor(targetHeight / 2) - 2, left: 0 });
+      compositeList.push({ input: Buffer.from(vLine), top: 0, left: Math.floor(targetWidth / 2) - 2 });
+    }
+
+    // ── 3. Cinematic Vignette + Bottom Gradient Overlay ─────────────────────────
+    const vignetteSvg = `<svg width="${targetWidth}" height="${targetHeight}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="vig" cx="50%" cy="50%" r="70%">
+          <stop offset="40%" stop-color="rgba(0,0,0,0)" stop-opacity="0"/>
+          <stop offset="100%" stop-color="rgba(0,0,0,0.65)" stop-opacity="1"/>
+        </radialGradient>
+        <linearGradient id="btm" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="55%" stop-color="rgba(0,0,0,0)" stop-opacity="0"/>
+          <stop offset="100%" stop-color="rgba(0,0,0,0.80)" stop-opacity="1"/>
+        </linearGradient>
+      </defs>
+      <rect width="${targetWidth}" height="${targetHeight}" fill="url(#vig)"/>
+      <rect width="${targetWidth}" height="${targetHeight}" fill="url(#btm)"/>
+    </svg>`;
+    compositeList.push({ input: Buffer.from(vignetteSvg), top: 0, left: 0 });
+
+    // ── 4. Premium Caption Overlay ───────────────────────────────────────────────
     if (smartCaption) {
-      const fontSize = Math.floor(targetHeight * 0.08); // Responsive font size
-      const svgText = `
-        <svg width="${targetWidth}" height="${targetHeight}">
-          <style>
-            .title { 
-              fill: white; 
-              font-size: ${fontSize}px; 
-              font-weight: bold; 
-              font-family: 'Sora', sans-serif;
-              filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.8));
-            }
-          </style>
-          <text x="50%" y="90%" text-anchor="middle" class="title">${smartCaption}</text>
-        </svg>
-      `;
-      processedImages.push({
-        input: Buffer.from(svgText),
-        top: 0,
-        left: 0
-      });
+      const escaped = smartCaption.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      const fontSize    = Math.max(48, Math.floor(targetHeight * 0.075));
+      const subFontSize = Math.max(22, Math.floor(fontSize * 0.38));
+      const captionY    = Math.floor(targetHeight * 0.84);
+      const subY        = captionY + fontSize * 0.85;
+
+      const captionSvg = `<svg width="${targetWidth}" height="${targetHeight}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="glow" x="-20%" y="-40%" width="140%" height="180%">
+            <feGaussianBlur stdDeviation="12" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="shadow" x="-10%" y="-30%" width="120%" height="160%">
+            <feDropShadow dx="0" dy="4" stdDeviation="10" flood-color="rgba(0,0,0,0.9)" flood-opacity="1"/>
+          </filter>
+        </defs>
+
+        <!-- Glow halo behind title -->
+        <text x="50%" y="${captionY}" text-anchor="middle" dominant-baseline="alphabetic"
+          font-family="'Trebuchet MS', Arial Black, sans-serif"
+          font-weight="900" font-size="${fontSize}" fill="rgba(16,185,129,0.25)"
+          filter="url(#glow)" style="letter-spacing:4px">
+          ${escaped}
+        </text>
+
+        <!-- Main title -->
+        <text x="50%" y="${captionY}" text-anchor="middle" dominant-baseline="alphabetic"
+          font-family="'Trebuchet MS', Arial Black, sans-serif"
+          font-weight="900" font-size="${fontSize}" fill="white"
+          filter="url(#shadow)" style="letter-spacing:4px">
+          ${escaped}
+        </text>
+
+        ${prompt ? `<!-- Subtitle line -->
+        <text x="50%" y="${subY}" text-anchor="middle" dominant-baseline="alphabetic"
+          font-family="'Trebuchet MS', Arial, sans-serif"
+          font-weight="400" font-size="${subFontSize}" fill="rgba(255,255,255,0.65)"
+          style="letter-spacing:3px">
+          ${escaped.substring(0, 40).toUpperCase()}
+        </text>` : ''}
+
+        <!-- Accent line under title -->
+        <rect x="${Math.floor(targetWidth / 2) - 60}" y="${captionY + 12}" width="120" height="4"
+          rx="2" fill="rgba(16,185,129,0.9)"/>
+      </svg>`;
+
+      compositeList.push({ input: Buffer.from(captionSvg), top: 0, left: 0 });
     }
 
-    // 4. Create final composite
-    await sharp({
-      create: {
-        width: targetWidth,
-        height: targetHeight,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 0 }
-      }
+    // ── 5. Render final composite ────────────────────────────────────────────────
+    const finalBuffer = await sharp({
+      create: { width: targetWidth, height: targetHeight, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 1 } }
     })
-    .composite(processedImages)
-    .png()
-    .toFile(bannerPath);
+    .composite(compositeList)
+    .webp({ quality: 90, effort: 4 })
+    .toBuffer();
 
-    // Cleanup
-    imageFiles.forEach(f => fs.unlinkSync(f.path));
-
-    res.json({ success: true, bannerUrl: `/uploads/${bannerName}` });
+    const bannerUrl = `data:image/webp;base64,${finalBuffer.toString("base64")}`;
+    console.log(`[Banner Creator] ✅ Success — ${(finalBuffer.length / 1024).toFixed(0)}KB, ${targetWidth}x${targetHeight}`);
+    res.json({ success: true, bannerUrl });
 
   } catch (err) {
-    console.error("Banner creation error:", err.message);
-    res.status(500).json({ error: "Failed to create banner." });
-    if (req.files) req.files.forEach(f => { if(fs.existsSync(f.path)) fs.unlinkSync(f.path); });
+    console.error("Banner creation error:", err.message, err.stack);
+    res.status(500).json({ error: "Failed to create banner: " + err.message });
   }
 });
 
