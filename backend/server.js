@@ -15,6 +15,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "..", "frontend")));
 
+// Serve a small inline SVG favicon at /favicon.ico to avoid 404s
+app.get('/favicon.ico', (req, res) => {
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+  <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
+    <rect width='100' height='100' rx='18' fill='%23111'/>
+    <text x='50' y='60' font-size='56' text-anchor='middle'>🤖</text>
+  </svg>`;
+  res.set('Content-Type', 'image/svg+xml');
+  res.send(svg);
+});
+
 // ─── Multer Setup ────────────────────────────────────────────────────────────
 const storage = multer.memoryStorage();
 
