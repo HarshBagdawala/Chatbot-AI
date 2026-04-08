@@ -117,8 +117,8 @@ async function performWebSearch(query) {
 // ─── Product Search Functions ────────────────────────────────────────────────
 async function describeImage(imageUrl) {
   try {
-    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-      model: 'gpt-4-vision-preview',
+    const response = await axios.post('https://api.mistral.ai/v1/chat/completions', {
+      model: 'pixtral-12b-2409',
       messages: [
         {
           role: 'user',
@@ -131,7 +131,7 @@ async function describeImage(imageUrl) {
       max_tokens: 200
     }, {
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`,
         'Content-Type': 'application/json'
       }
     });
