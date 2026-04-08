@@ -8,6 +8,7 @@ const sharp = require("sharp");
 const { createClient } = require("@supabase/supabase-js");
 const Groq = require("groq-sdk");
 const { v4: uuidv4 } = require("uuid");
+const axios = require("axios");
 
 const app = express();
 app.use(cors());
@@ -99,6 +100,70 @@ async function performWebSearch(query) {
   } catch (err) {
     console.error("Web search failed:", err.message);
     return "Error performing web search. Search engine is currently unavailable.";
+  }
+}
+
+// ─── Product Search Functions ────────────────────────────────────────────────
+async function describeImage(imageUrl) {
+  try {
+    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+      model: 'gpt-4-vision-preview',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Describe this image in detail, focusing on any products, items, or objects visible. Provide a concise description suitable for product search.' },
+            { type: 'image_url', image_url: { url: imageUrl } }
+          ]
+        }
+      ],
+      max_tokens: 200
+    }, {
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    return response.data.choices[0].message.content.trim();
+  } catch (error) {
+    console.error('Image description error:', error.message);
+    return 'Unknown product from image';
+  }
+}
+
+async function searchProducts(query) {
+  try {
+    const response = await axios.post('https://google.serper.dev/shopping', {
+      q: query,
+      num: 10
+    }, {
+      headers: {
+        'X-API-KEY': process.env.SERPER_API_KEY,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const results = response.data.shopping || [];
+    const products = [];
+    const seenTitles = new Set();
+
+    for (const result of results) {
+      if (products.length >= 4) break;
+      const title = result.title?.trim();
+      if (title && !seenTitles.has(title) && result.link) {
+        products.push({
+          title: title,
+          link: result.link,
+          snippet: result.snippet?.trim() || 'No description available'
+        });
+        seenTitles.add(title);
+      }
+    }
+
+    return products;
+  } catch (error) {
+    console.error('Product search error:', error.message);
+    return [];
   }
 }
 
@@ -516,6 +581,7 @@ Key behavior rules:
 6. WEATHER: For ANY questions about weather, temperature, or forecasts for ANY city, region, or country globally, you MUST use the 'get_weather' tool. Do NOT guess or use old data. Always return a rich weather report with full live details, local time, temperature range, humidity, wind, visibility, sunrise/sunset, and a helpful tip. Always format the weather answer using Markdown-style headings, bold labels, and clear bullet lists. This must work for any city name the user provides. 🌦️
 7. WEB SEARCH: For other real-time news or general facts, use 'search_web'. 🔍
 8. IMAGE GENERATION: If the user asks to "generate", "create", "draw", or "make" an image, use the 'generate_image' tool. After the tool returns a URL, you MUST include the tag \`[IMAGE_GEN: url]\` in your final response to display it. 🎨
+9. PRODUCT SEARCH: If the user asks to "find", "search", "buy", "where to buy", or similar questions about products, items, or shopping, use the 'search_products' tool. Provide a clear product query like "wireless headphones" or "red dress". Always return a list of 4 different products with titles, links, and descriptions. 🛒
 
 You can help with: coding, science, history, general knowledge, math, creative writing, advice, and much more!`;
 
@@ -692,6 +758,23 @@ app.post("/api/chat", async (req, res) => {
           },
         },
       },
+      {
+        type: "function",
+        function: {
+          name: "search_products",
+          description: "Search for products online and return a list of 4 different products with titles, links, and descriptions.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+                description: "The product search query (e.g. 'wireless headphones', 'red dress').",
+              },
+            },
+            required: ["query"],
+          },
+        },
+      },
     ];
 
     // 3. Call Groq API
@@ -731,6 +814,15 @@ app.post("/api/chat", async (req, res) => {
           const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(args.prompt)}?width=1024&height=1024&nologo=true&seed=${randomSeed}`;
           toolResults = `Successfully generated the image. Tell the user you've created it and MUST include this exact tag in your response: [IMAGE_GEN: ${imageUrl}]`;
           console.log(`Generated Image URL: ${imageUrl}`);
+        } else if (toolCall.function.name === 'search_products') {
+          const args = JSON.parse(toolCall.function.arguments);
+          console.log(`Searching products for: ${args.query}`);
+          const products = await searchProducts(args.query);
+          if (products.length > 0) {
+            toolResults = "Found the following products:\n" + products.map((p, i) => `${i+1}. **${p.title}**\n   Link: ${p.link}\n   ${p.snippet}`).join('\n\n');
+          } else {
+            toolResults = "No products found for the search query.";
+          }
         }
         
         messages.push({
@@ -1082,6 +1174,28 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
   } catch (err) {
     console.error("Banner creation error:", err.message, err.stack);
     res.status(500).json({ error: "Failed to create banner: " + err.message });
+  }
+});
+
+// ─── Product Search ──────────────────────────────────────────────────────────
+app.post('/api/product-search', async (req, res) => {
+  try {
+    const { query, imageUrl } = req.body;
+    let searchQuery = query;
+
+    if (imageUrl) {
+      console.log('[Product Search] Analyzing image...');
+      searchQuery = await describeImage(imageUrl);
+      console.log('[Product Search] Image description:', searchQuery);
+    }
+
+    console.log('[Product Search] Searching for:', searchQuery);
+    const products = await searchProducts(searchQuery);
+
+    res.json({ products });
+  } catch (error) {
+    console.error('Product search API error:', error);
+    res.status(500).json({ error: 'Failed to search products' });
   }
 });
 

@@ -706,6 +706,37 @@ async function sendMessage(isVoice = false) {
 
   appendMessage('user', msg);
   
+  // Check if user is asking for product search
+  if (isProductSearch(msg)) {
+    showTyping();
+    fetch('/api/product-search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: msg })
+    })
+    .then(res => res.json())
+    .then(data => {
+      hideTyping();
+      if (data.products && data.products.length > 0) {
+        let reply = 'Here are some products I found:\n\n';
+        data.products.forEach(p => {
+          reply += `### ${p.title}\n${p.snippet}\n[View Product](${p.link})\n\n`;
+        });
+        appendMessage('assistant', reply);
+      } else {
+        appendMessage('assistant', 'Sorry, I couldn\'t find any products matching your search.');
+      }
+    })
+    .catch(err => {
+      hideTyping();
+      showToast('❌ Error searching products');
+      console.error('Product search error:', err);
+    });
+    sendBtn.disabled = false;
+    userInput.focus();
+    return;
+  }
+  
   // Check if user is asking to upload/create images
   if (isImageUploadRequest(msg)) {
     showToast('📸 Click the attachment button or select images!');
@@ -1024,12 +1055,69 @@ function closeMusic() {
   if (musicPlayerContainer) musicPlayerContainer.classList.add('disabled');
 }
 
+// ─── Product Search ──────────────────────────────────────────────────────────
+let isProductSearchMode = false;
+
+function openProductSearch() {
+  isProductSearchMode = true;
+  document.getElementById('imageUploadInput').accept = 'image/*';
+  document.getElementById('imageUploadInput').multiple = false;
+  document.getElementById('imageUploadInput').click();
+}
+
+function isProductSearch(message) {
+  const keywords = ['find product', 'search product', 'buy', 'price', 'where to buy', 'product', 'shopping'];
+  return keywords.some(k => message.toLowerCase().includes(k));
+}
+
 // ─── Smart Banner Maker Logic ────────────────────────────────────────────────
 let selectedFiles = [];
 
 function handleImageSelection(event) {
   const files = Array.from(event.target.files);
   if (files.length === 0) return;
+
+  if (isProductSearchMode) {
+    // Product search with image
+    isProductSearchMode = false;
+    document.getElementById('imageUploadInput').multiple = true; // Reset
+    document.getElementById('imageUploadInput').accept = 'image/*'; // Reset
+
+    const file = files[0];
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const imageUrl = e.target.result;
+      appendMessage('user', `🔍 Searching for products based on this image...`);
+      showTyping();
+
+      fetch('/api/product-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl })
+      })
+      .then(res => res.json())
+      .then(data => {
+        hideTyping();
+        if (data.products && data.products.length > 0) {
+          let reply = 'Here are some products I found based on the image:\n\n';
+          data.products.forEach(p => {
+            reply += `### ${p.title}\n${p.snippet}\n[View Product](${p.link})\n\n`;
+          });
+          appendMessage('assistant', reply);
+        } else {
+          appendMessage('assistant', 'Sorry, I couldn\'t find any matching products for that image.');
+        }
+      })
+      .catch(err => {
+        hideTyping();
+        showToast('❌ Error searching products');
+        console.error('Product search error:', err);
+      });
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+    return;
+  }
   
   if (files.length > 5) {
     showToast("⚠️ Maximum 5 images allowed.");
@@ -1077,7 +1165,35 @@ function openBannerModal() {
     });
   }
 
+  // Set default mode
+  setMode('collage');
+
   document.getElementById('bannerModal').classList.add('active');
+}
+
+function setMode(mode) {
+  const modeCards = document.querySelectorAll('.mode-card');
+  modeCards.forEach(card => card.classList.remove('active'));
+  
+  const activeCard = document.querySelector(`input[name="bannerMode"][value="${mode}"]`).closest('.mode-card');
+  activeCard.classList.add('active');
+
+  const sizeLabel = document.getElementById('sizeLabel');
+  const sizeOptions = document.getElementById('sizeOptions');
+  const promptContainer = document.querySelector('.banner-prompt-container');
+  const btnText = document.getElementById('btnCreateText');
+
+  if (mode === 'collage') {
+    sizeLabel.style.display = 'block';
+    sizeOptions.style.display = 'grid';
+    promptContainer.style.display = 'block';
+    btnText.textContent = '✨ Create Collage';
+  } else {
+    sizeLabel.style.display = 'none';
+    sizeOptions.style.display = 'none';
+    promptContainer.style.display = 'none';
+    btnText.textContent = '🔍 Find Products';
+  }
 }
 
 function closeBannerModal() {
@@ -1091,14 +1207,58 @@ function closeBannerModal() {
 async function createBanner() {
   if (selectedFiles.length === 0) return;
   
+  const mode = document.querySelector('input[name="bannerMode"]:checked').value;
+  
+  const btn = document.getElementById('btnCreateBanner');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span>⏳ Processing…</span>'; }
+
+  closeBannerModal();
+  
+  if (mode === 'search') {
+    // Product search mode
+    const file = selectedFiles[0]; // Use first image
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const imageUrl = e.target.result;
+      appendMessage('user', `🔍 Finding products similar to this image…`);
+      showTyping();
+      
+      try {
+        const res = await fetch('/api/product-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl })
+        });
+        
+        const data = await res.json();
+        hideTyping();
+        
+        if (data.products && data.products.length > 0) {
+          let reply = 'Here are some similar products I found:\n\n';
+          data.products.forEach((p, i) => {
+            reply += `${i+1}. **${p.title}**\n   ${p.snippet}\n   [View Product](${p.link})\n\n`;
+          });
+          appendMessage('assistant', reply);
+          showToast("✅ Products Found!");
+        } else {
+          appendMessage('assistant', 'Sorry, I couldn\'t find any matching products for that image.');
+        }
+      } catch (err) {
+        hideTyping();
+        showToast('❌ Error searching products');
+        console.error('Product search error:', err);
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<span>🔍 Find Products</span>'; }
+      }
+    };
+    reader.readAsDataURL(file);
+    return;
+  }
+  
+  // Collage mode
   const size = document.querySelector('input[name="bannerSize"]:checked').value;
   const prompt = document.getElementById('bannerPrompt')?.value.trim() || '';
   const filesToUpload = [...selectedFiles];
-  
-  const btn = document.getElementById('btnCreateBanner');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span>⏳ Creating…</span>'; }
-
-  closeBannerModal();
   
   const sizeLabel = { landscape: 'Landscape 1920×1080', square: 'Square 1080×1080', portrait: 'Portrait 1080×1920' }[size] || size;
   const imagePreviews = filesToUpload.map((file) => URL.createObjectURL(file));

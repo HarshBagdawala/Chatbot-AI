@@ -1516,6 +1516,25 @@ header {
   height: 20px;
 }
 
+.product-search-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: all 0.3s;
+  margin-right: 8px;
+}
+
+.product-search-btn:hover {
+  color: var(--accent);
+  transform: scale(1.1);
+}
+
 /*  Banner Modal  */
 .banner-modal {
   position: fixed;
@@ -1687,6 +1706,62 @@ header {
   border-color: var(--accent);
   background: rgba(16,185,129,0.05);
   box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* Mode Options */
+.mode-options {
+  display: flex;
+  gap: 12px;
+  padding: 0 24px;
+  margin-bottom: 16px;
+}
+
+.mode-card {
+  flex: 1;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+}
+
+.mode-card:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.mode-card.active {
+  background: rgba(16,185,129,0.1);
+  border-color: var(--accent);
+}
+
+.mode-card input[type="radio"] {
+  display: none;
+}
+
+.mode-icon {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.mode-card span {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.mode-card small {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  opacity: 0.7;
 }
 
 /* Size Options */
