@@ -1520,7 +1520,8 @@ header {
   width: 100%;
   max-width: 540px;
   box-shadow: 0 30px 80px rgba(0,0,0,0.7), 0 0 60px rgba(16,185,129,0.05);
-  overflow: hidden;
+  overflow-y: scroll;
+  height: 40rem;
 }
 
 /* Header */
