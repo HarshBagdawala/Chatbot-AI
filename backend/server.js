@@ -341,7 +341,7 @@ function generateHTMLPage(pageTitle = "My Page", bodyContent = "") {
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;   
             line-height: 1.6;
             color: #333;
             background-color: #f4f4f4;
