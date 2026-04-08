@@ -147,7 +147,7 @@ async function searchProducts(query) {
   try {
     const response = await axios.post('https://google.serper.dev/shopping', {
       q: query,
-      num: 10
+      num: 20  // Get more results to filter better
     }, {
       headers: {
         'X-API-KEY': process.env.SERPER_API_KEY,
@@ -156,38 +156,73 @@ async function searchProducts(query) {
     });
 
     const results = response.data.shopping || [];
-    console.log('[Product Search] Serper API Response:', JSON.stringify(results.slice(0, 2), null, 2));
+    console.log('[Product Search] Serper returned', results.length, 'results');
     
     const products = [];
     const seenTitles = new Set();
+    const queryWords = query.toLowerCase().split(/\s+/);
 
     for (const result of results) {
       if (products.length >= 4) break;
-      const title = result.title?.trim();
       
-      if (title && !seenTitles.has(title) && result.link) {
-        // Extract only price number (remove currency symbol and text)
-        let cleanPrice = 'Price not available';
-        if (result.price) {
-          const priceMatch = result.price.match(/[\d,]+\.?\d*/);
-          cleanPrice = priceMatch ? priceMatch[0] : result.price;
-        }
-
-        const product = {
-          title: title,
-          link: result.link,
-          image: result.image || null,
-          price: cleanPrice,
-          description: result.snippet?.trim() || 'No description available',
-          source: result.source || 'Online Store',
-          rating: result.rating || null
-        };
-        
-        console.log('[Product Search] Added product:', product.title, 'Image:', product.image);
-        products.push(product);
-        seenTitles.add(title);
+      const title = result.title?.trim();
+      const price = result.price?.trim();
+      const image = result.image?.trim();
+      const snippet = result.snippet?.trim();
+      
+      // Skip if missing critical fields
+      if (!title || !price || !image || seenTitles.has(title)) {
+        continue;
       }
+
+      // Skip if title contains non-product keywords
+      const titleLower = title.toLowerCase();
+      const blacklistKeywords = ['music', 'album', 'song', 'artist', 'soundtrack', 'ep', 'vinyl', 'book', 'ebook', 'journal', 'novel'];
+      if (blacklistKeywords.some(keyword => titleLower.includes(keyword))) {
+        console.log('[Product Search] Skipping non-product:', title);
+        continue;
+      }
+
+      // Check if at least one search keyword is in the title
+      const hasRelevantKeyword = queryWords.some(word => 
+        word.length > 2 && titleLower.includes(word)
+      );
+      
+      if (!hasRelevantKeyword && !titleLower.includes('product')) {
+        console.log('[Product Search] Skipping irrelevant:', title);
+        continue;
+      }
+
+      // Extract clean price
+      let cleanPrice = price;
+      const priceMatch = price.match(/[\d,]+\.?\d*/);
+      if (priceMatch) {
+        cleanPrice = priceMatch[0];
+      }
+
+      // Validate image URL (must be proper http/https URL)
+      if (!image.startsWith('http')) {
+        console.log('[Product Search] Skipping - invalid image URL:', title);
+        continue;
+      }
+
+      const product = {
+        title: title,
+        link: result.link || '#',
+        image: image,
+        price: cleanPrice,
+        description: snippet || 'Product available for purchase',
+        source: result.source || 'Online Store',
+        rating: result.rating || null
+      };
+      
+      console.log('[Product Search] Added product:', product.title, 'Price:', cleanPrice);
+      products.push(product);
+      seenTitles.add(title);
     }
+
+    console.log('[Product Search] Final products count:', products.length);
+    return products;
 
     return products;
   } catch (error) {
