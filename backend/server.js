@@ -295,16 +295,17 @@ async function getWeatherData(city) {
     const advice = getWeatherAdvice(condLower, temp, humidity);
 
     return `### 🌦️ Live Weather in ${name}, ${country} ${emoji}
+
 - **Local time**: ${localTime}
-- **Temperature**: ${temp}°C (Feels like ${feelsLike}°C)
-- **Min / Max**: ${minTemp}°C / ${maxTemp}°C
-- **Condition**: ${condition} — ${description}
-- **Humidity**: ${humidity}%
-- **Pressure**: ${pressure} hPa
-- **Wind**: ${windSpeed} m/s (${windDir})
-- **Cloud cover**: ${cloudsPct}%
-- **Visibility**: ${visibilityKm} km
-- **Sunrise / Sunset**: ${sunriseTime} / ${sunsetTime}
+- **Temperature**: **${temp}°C** (Feels like ${feelsLike}°C)
+- **Min / Max**: **${minTemp}°C / ${maxTemp}°C**
+- **Condition**: **${condition}** — ${description}
+- **Humidity**: **${humidity}%**
+- **Pressure**: **${pressure} hPa**
+- **Wind**: **${windSpeed} m/s** (${windDir})
+- **Cloud cover**: **${cloudsPct}%**
+- **Visibility**: **${visibilityKm} km**
+- **Sunrise / Sunset**: **${sunriseTime} / ${sunsetTime}**
 
 **Weather tip:** ${advice}`;
 
