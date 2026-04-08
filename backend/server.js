@@ -156,22 +156,35 @@ async function searchProducts(query) {
     });
 
     const results = response.data.shopping || [];
+    console.log('[Product Search] Serper API Response:', JSON.stringify(results.slice(0, 2), null, 2));
+    
     const products = [];
     const seenTitles = new Set();
 
     for (const result of results) {
       if (products.length >= 4) break;
       const title = result.title?.trim();
+      
       if (title && !seenTitles.has(title) && result.link) {
-        products.push({
+        // Extract only price number (remove currency symbol and text)
+        let cleanPrice = 'Price not available';
+        if (result.price) {
+          const priceMatch = result.price.match(/[\d,]+\.?\d*/);
+          cleanPrice = priceMatch ? priceMatch[0] : result.price;
+        }
+
+        const product = {
           title: title,
           link: result.link,
-          image: result.image || 'https://via.placeholder.com/300x300?text=Product+Image',
-          price: result.price || 'Price not available',
+          image: result.image || null,
+          price: cleanPrice,
           description: result.snippet?.trim() || 'No description available',
           source: result.source || 'Online Store',
           rating: result.rating || null
-        });
+        };
+        
+        console.log('[Product Search] Added product:', product.title, 'Image:', product.image);
+        products.push(product);
         seenTitles.add(title);
       }
     }
@@ -1207,11 +1220,12 @@ app.post('/api/product-search', async (req, res) => {
 
     console.log('[Product Search] Searching for:', searchQuery);
     const products = await searchProducts(searchQuery);
-
-    res.json({ products });
+    
+    console.log('[Product Search] Final Response:', JSON.stringify(products, null, 2));
+    res.json({ products, success: true });
   } catch (error) {
-    console.error('Product search API error:', error);
-    res.status(500).json({ error: 'Failed to search products' });
+    console.error('Product search API error:', error.message);
+    res.status(500).json({ error: 'Failed to search products', details: error.message });
   }
 });
 

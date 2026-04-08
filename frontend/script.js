@@ -717,9 +717,13 @@ async function sendMessage(isVoice = false) {
     .then(res => res.json())
     .then(data => {
       hideTyping();
+      console.log('[Frontend] Product search response:', data);
+      
       if (data.products && data.products.length > 0) {
         appendMessage('assistant', '🛍️ Here are some products I found:', { rawHtml: false });
         const carouselHtml = generateProductCarousel(data.products);
+        console.log('[Frontend] Generated carousel HTML:', carouselHtml);
+        
         const div = document.createElement('div');
         div.className = 'message assistant';
         div.innerHTML = carouselHtml;
@@ -1077,22 +1081,30 @@ function generateProductCarousel(products) {
   if (!products || products.length === 0) return '';
   
   const carouselId = `carousel_${Date.now()}`;
-  const productCards = products.map(p => `
+  const productCards = products.map(p => {
+    const imageUrl = p.image && p.image.trim() ? p.image : 'https://via.placeholder.com/300x300?text=No+Image';
+    const title = p.title || 'Unknown Product';
+    const price = p.price || 'Price not available';
+    const description = p.description || 'No description available';
+    const link = p.link || '#';
+    
+    return `
     <div class="product-card">
       <div class="product-image-wrapper">
-        <img src="${p.image}" alt="${p.title}" class="product-image" onerror="this.src='https://via.placeholder.com/300x300?text=Product'">
+        <img src="${imageUrl}" alt="${title}" class="product-image" onerror="this.src='https://via.placeholder.com/300x300?text=No+Image'" loading="lazy">
         ${p.rating ? `<div class="product-rating">⭐ ${p.rating}</div>` : ''}
       </div>
       <div class="product-info">
-        <h4 class="product-title">${p.title}</h4>
-        <p class="product-description">${p.description}</p>
+        <h4 class="product-title">${title}</h4>
+        <p class="product-description">${description}</p>
         <div class="product-footer">
-          <span class="product-price">${p.price}</span>
-          <a href="${p.link}" target="_blank" class="product-link">View Product →</a>
+          <span class="product-price">₹${price}</span>
+          <a href="${link}" target="_blank" class="product-link">View →</a>
         </div>
       </div>
     </div>
-  `).join('');
+    `;
+  }).join('');
 
   return `
     <div class="products-carousel-container">
