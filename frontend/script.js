@@ -299,7 +299,25 @@ function appendMessage(role, content) {
     return id;
   });
 
-  // 2. Format the rest (Bold, Italics, Newlines)
+  // 2. Format headings, lists, bold, italics, and newlines
+  formatted = formatted
+    .replace(/^###### (.*)$/gm, '<h6>$1</h6>')
+    .replace(/^##### (.*)$/gm, '<h5>$1</h5>')
+    .replace(/^#### (.*)$/gm, '<h4>$1</h4>')
+    .replace(/^### (.*)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.*)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.*)$/gm, '<h1>$1</h1>');
+
+  formatted = formatted.replace(/(^|\n)((?:\s*[-*]\s+.*(?:\n|$))+)/g, (full, before, listBlock) => {
+    const items = listBlock
+      .trim()
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map(line => `<li>${line.replace(/^\s*[-*]\s+/, '').trim()}</li>`)
+      .join('');
+    return `${before}<ul>${items}</ul>\n`;
+  });
+
   formatted = formatted
     .replace(/`([^`]+)`/g, '<code>$1</code>') // Inline code
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
@@ -414,7 +432,25 @@ function saveEdit(messageDiv, newContent) {
     return id;
   });
 
-  // Format the rest
+  // Format headings, lists, bold, italics, and newlines
+  formatted = formatted
+    .replace(/^###### (.*)$/gm, '<h6>$1</h6>')
+    .replace(/^##### (.*)$/gm, '<h5>$1</h5>')
+    .replace(/^#### (.*)$/gm, '<h4>$1</h4>')
+    .replace(/^### (.*)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.*)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.*)$/gm, '<h1>$1</h1>');
+
+  formatted = formatted.replace(/(^|\n)((?:\s*[-*]\s+.*(?:\n|$))+)/g, (full, before, listBlock) => {
+    const items = listBlock
+      .trim()
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map(line => `<li>${line.replace(/^\s*[-*]\s+/, '').trim()}</li>`)
+      .join('');
+    return `${before}<ul>${items}</ul>\n`;
+  });
+
   formatted = formatted
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
