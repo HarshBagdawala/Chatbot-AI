@@ -212,56 +212,105 @@ async function searchYoutubeVideo(query) {
 
 
 // ─── Weather API (OpenWeatherMap) ───────────────────────────────────────────
+function getWindDirection(deg = 0) {
+  const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  const index = Math.floor(((deg % 360) + 360) / 22.5);
+  return directions[index % directions.length];
+}
+
+function formatLocalTime(timestampSec, timezoneOffsetSec) {
+  const timeMs = timestampSec ? timestampSec * 1000 : Date.now();
+  const localDate = new Date(timeMs + timezoneOffsetSec * 1000);
+  return localDate.toLocaleTimeString('en-US', {
+    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC'
+  });
+}
+
+function getWeatherAdvice(condition, temp, humidity) {
+  const adviceParts = [];
+  if (condition.includes('rain') || condition.includes('drizzle') || condition.includes('thunder')) {
+    adviceParts.push('Carry an umbrella or raincoat.');
+  } else if (condition.includes('clear') && temp >= 28) {
+    adviceParts.push('Stay hydrated and use sunscreen if you go outside.');
+  } else if (condition.includes('snow')) {
+    adviceParts.push('Dress warmly and watch for slippery surfaces.');
+  } else if (condition.includes('fog') || condition.includes('mist')) {
+    adviceParts.push('Drive carefully and use low-beam headlights.');
+  }
+
+  if (temp >= 35) adviceParts.push('It is very hot — drink plenty of water.');
+  if (temp <= 10) adviceParts.push('It is chilly — wear warm clothing.');
+  if (humidity >= 85) adviceParts.push('High humidity makes it feel heavier outside.');
+
+  return adviceParts.length ? adviceParts.join(' ') : 'Weather looks stable and comfortable for most activities.';
+}
+
 async function getWeatherData(city) {
   const apiKey = process.env.OPENWEATHER_API_KEY;
   if (!apiKey || apiKey.includes('your_openweather_api_key_here')) {
-    return "Weather API is not configured. Please add your OpenWeatherMap API key to the .env file. 🛠️";
+    return 'Weather API is not configured. Please add your OpenWeatherMap API key to the .env file. 🛠️';
   }
 
   try {
     console.log(`Fetching weather for: ${city}`);
-    
-    // 1. Fetch current weather from OpenWeatherMap
+
     const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`;
     const response = await fetch(url);
     const data = await response.json();
-    
+
     if (data.cod !== 200) {
       console.log(`OpenWeatherMap error: ${data.message}`);
-      if (data.cod === "404") return `I'm sorry, I couldn't find the location "${city}". Please check the spelling. 🌏`;
-      if (data.cod === 401) return "Invalid API Key. Please check your OpenWeatherMap credentials. 🔑";
+      if (data.cod === '404') return `I'm sorry, I couldn't find the location "${city}". Please check the spelling. 🌏`;
+      if (data.cod === 401) return 'Invalid API Key. Please check your OpenWeatherMap credentials. 🔑';
       throw new Error(data.message);
     }
-    
-    // 2. Parse and format the response
-    const { main, weather, wind, name, sys } = data;
+
+    const { main, weather, wind, name, sys, clouds, visibility, timezone } = data;
     const temp = Math.round(main.temp);
     const feelsLike = Math.round(main.feels_like);
-    const condition = weather[0].main;
-    const description = weather[0].description;
+    const minTemp = Math.round(main.temp_min);
+    const maxTemp = Math.round(main.temp_max);
+    const pressure = main.pressure;
     const humidity = main.humidity;
     const windSpeed = wind.speed;
+    const windDir = getWindDirection(wind.deg || 0);
+    const condition = weather[0].main;
+    const description = weather[0].description;
     const country = sys.country;
+    const cloudsPct = clouds?.all ?? 0;
+    const visibilityKm = visibility ? (visibility / 1000).toFixed(1) : 'N/A';
+    const localTime = formatLocalTime(null, timezone);
+    const sunriseTime = formatLocalTime(sys.sunrise, timezone);
+    const sunsetTime = formatLocalTime(sys.sunset, timezone);
 
-    // Get a relevant emoji based on the weather condition
-    let emoji = "🌡️";
+    let emoji = '🌡️';
     const condLower = condition.toLowerCase();
-    if (condLower.includes("cloud")) emoji = "☁️";
-    else if (condLower.includes("rain")) emoji = "🌧️";
-    else if (condLower.includes("clear")) emoji = "☀️";
-    else if (condLower.includes("snow")) emoji = "❄️";
-    else if (condLower.includes("thunder")) emoji = "⛈️";
-    else if (condLower.includes("mist") || condLower.includes("fog")) emoji = "🌫️";
+    if (condLower.includes('cloud')) emoji = '☁️';
+    else if (condLower.includes('rain') || condLower.includes('drizzle')) emoji = '🌧️';
+    else if (condLower.includes('clear')) emoji = '☀️';
+    else if (condLower.includes('snow')) emoji = '❄️';
+    else if (condLower.includes('thunder')) emoji = '⛈️';
+    else if (condLower.includes('mist') || condLower.includes('fog')) emoji = '🌫️';
 
-    return `### Current Weather in ${name}, ${country} ${emoji}
+    const advice = getWeatherAdvice(condLower, temp, humidity);
+
+    return `### 🌦️ Live Weather in ${name}, ${country} ${emoji}
+- **Local time**: ${localTime}
 - **Temperature**: ${temp}°C (Feels like ${feelsLike}°C)
-- **Condition**: ${condition} (${description})
+- **Min / Max**: ${minTemp}°C / ${maxTemp}°C
+- **Condition**: ${condition} — ${description}
 - **Humidity**: ${humidity}%
-- **Wind Speed**: ${windSpeed} m/s`;
+- **Pressure**: ${pressure} hPa
+- **Wind**: ${windSpeed} m/s (${windDir})
+- **Cloud cover**: ${cloudsPct}%
+- **Visibility**: ${visibilityKm} km
+- **Sunrise / Sunset**: ${sunriseTime} / ${sunsetTime}
+
+**Weather tip:** ${advice}`;
 
   } catch (err) {
-    console.error("OpenWeatherMap API error:", err.message);
-    return "Error: Could not retrieve weather data from OpenWeatherMap at this time. 🛑";
+    console.error('OpenWeatherMap API error:', err.message);
+    return 'Error: Could not retrieve weather data from OpenWeatherMap at this time. 🛑';
   }
 }
 
@@ -463,7 +512,7 @@ Key behavior rules:
 3. For complex topics, break down your answer into simple steps. 🔢
 4. If you don't know something, be honest and say so.
 5. MUSIC REQUESTS: If the user asks you to play a song or music (e.g., "play some music", "play Believer by Imagine Dragons"), you MUST include exactly this tag in your response: \`[PLAY_MUSIC: song_name]\` (replace song_name with the requested song title, or "Relaxing Lofi Music" if no specific song is requested). 🎵
-6. WEATHER: For ANY questions about weather, temperature, or forecasts for ANY city, region, or country globally, you MUST use the 'get_weather' tool. Do NOT guess or use old data. 🌦️
+6. WEATHER: For ANY questions about weather, temperature, or forecasts for ANY city, region, or country globally, you MUST use the 'get_weather' tool. Do NOT guess or use old data. Always return a rich weather report with full live details, local time, temperature range, humidity, wind, visibility, sunrise/sunset, and a helpful tip. 🌦️
 7. WEB SEARCH: For other real-time news or general facts, use 'search_web'. 🔍
 8. IMAGE GENERATION: If the user asks to "generate", "create", "draw", or "make" an image, use the 'generate_image' tool. After the tool returns a URL, you MUST include the tag \`[IMAGE_GEN: url]\` in your final response to display it. 🎨
 
