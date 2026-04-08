@@ -264,7 +264,7 @@ function getTime() {
   return new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 }
 
-function appendMessage(role, content) {
+function appendMessage(role, content, options = {}) {
   hideWelcome();
   const div = document.createElement('div');
   div.className = `message ${role}`;
@@ -272,62 +272,66 @@ function appendMessage(role, content) {
 
   const avatar = role === 'user' ? '👤' : '🤖';
 
+  const { images = [], rawHtml = false } = options;
+
   // ─── Better Markdown-ish Formatting ───
   let formatted = content;
   const blocks = [];
 
-  // 1. Extract Triple Backtick Blocks (Code Blocks)
-  formatted = formatted.replace(/```([\s\S]*?)```/g, (match, code) => {
-    const id = `__BLOCK_${blocks.length}__`;
-    const escapedCode = code.trim()
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+  if (!rawHtml) {
+    // 1. Extract Triple Backtick Blocks (Code Blocks)
+    formatted = formatted.replace(/```([\s\S]*?)```/g, (match, code) => {
+      const id = `__BLOCK_${blocks.length}__`;
+      const escapedCode = code.trim()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 
-    blocks.push(`
-      <div class="code-block-wrapper">
-        <button class="copy-btn" onclick="copyToClipboard(this)">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-          </svg>
-          <span>Copy</span>
-        </button>
-        <pre><code>${escapedCode}</code></pre>
-      </div>
-    `);
-    return id;
-  });
+      blocks.push(`
+        <div class="code-block-wrapper">
+          <button class="copy-btn" onclick="copyToClipboard(this)">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>Copy</span>
+          </button>
+          <pre><code>${escapedCode}</code></pre>
+        </div>
+      `);
+      return id;
+    });
 
-  // 2. Format headings, lists, bold, italics, and newlines
-  formatted = formatted
-    .replace(/^###### (.*)$/gm, '<h6>$1</h6>')
-    .replace(/^##### (.*)$/gm, '<h5>$1</h5>')
-    .replace(/^#### (.*)$/gm, '<h4>$1</h4>')
-    .replace(/^### (.*)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.*)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.*)$/gm, '<h1>$1</h1>');
+    // 2. Format headings, lists, bold, italics, and newlines
+    formatted = formatted
+      .replace(/^###### (.*)$/gm, '<h6>$1</h6>')
+      .replace(/^##### (.*)$/gm, '<h5>$1</h5>')
+      .replace(/^#### (.*)$/gm, '<h4>$1</h4>')
+      .replace(/^### (.*)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.*)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.*)$/gm, '<h1>$1</h1>');
 
-  formatted = formatted.replace(/(^|\n)((?:\s*[-*]\s+.*(?:\n|$))+)/g, (full, before, listBlock) => {
-    const items = listBlock
-      .trim()
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .map(line => `<li>${line.replace(/^\s*[-*]\s+/, '').trim()}</li>`)
-      .join('');
-    return `${before}<ul>${items}</ul>\n`;
-  });
+    formatted = formatted.replace(/(^|\n)((?:\s*[-*]\s+.*(?:\n|$))+)/g, (full, before, listBlock) => {
+      const items = listBlock
+        .trim()
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .map(line => `<li>${line.replace(/^\s*[-*]\s+/, '').trim()}</li>`)
+        .join('');
+      return `${before}<ul>${items}</ul>\n`;
+    });
 
-  formatted = formatted
-    .replace(/`([^`]+)`/g, '<code>$1</code>') // Inline code
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
-    .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italics
-    .replace(/\n/g, '<br>'); // Newlines
+    formatted = formatted
+      .replace(/`([^`]+)`/g, '<code>$1</code>') // Inline code
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+      .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italics
+      .replace(/\n/g, '<br>'); // Newlines
 
-  // 3. Put Code Blocks back
-  blocks.forEach((block, i) => {
-    formatted = formatted.replace(`__BLOCK_${i}__`, block);
-  });
+    // 3. Put Code Blocks back
+    blocks.forEach((block, i) => {
+      formatted = formatted.replace(`__BLOCK_${i}__`, block);
+    });
+  }
 
   // 4. Handle [IMAGE_GEN: url]
   const imageMatch = formatted.match(/\[IMAGE_GEN:\s*(.*?)\]/i);
@@ -358,6 +362,19 @@ function appendMessage(role, content) {
       </div>
     `;
     if (!formatted) formatted = "I've generated this image for you: 🎨";
+  }
+
+  if (images.length) {
+    const previewItems = images.map((src) => `
+      <div class="message-image-item">
+        <img src="${src}" alt="User image preview" />
+      </div>
+    `).join('');
+    imageHTML += `
+      <div class="message-images">
+        ${previewItems}
+      </div>
+    `;
   }
   // ────────────────────────────────────────
 
@@ -1084,7 +1101,12 @@ async function createBanner() {
   closeBannerModal();
   
   const sizeLabel = { landscape: 'Landscape 1920×1080', square: 'Square 1080×1080', portrait: 'Portrait 1080×1920' }[size] || size;
-  appendMessage('user', `🎨 Creating a **${sizeLabel}** collage with **${filesToUpload.length}** image${filesToUpload.length > 1 ? 's' : ''}${prompt ? ` — "${prompt}"` : ''}…`);
+  const imagePreviews = filesToUpload.map((file) => URL.createObjectURL(file));
+  appendMessage(
+    'user',
+    `🎨 Creating a **${sizeLabel}** collage with **${filesToUpload.length}** image${filesToUpload.length > 1 ? 's' : ''}${prompt ? ` — "${prompt}"` : ''}…`,
+    { images: imagePreviews }
+  );
   showTyping();
   
   const formData = new FormData();
