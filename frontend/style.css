@@ -94,6 +94,9 @@ body::after {
     radial-gradient(circle at 0% 100%, var(--mesh-4) 0%, transparent 50%);
   filter: blur(80px);
 }
+ul {
+    margin-left: 20px;
+}
 
 
 /* ── Layout ── */
