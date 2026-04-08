@@ -1001,14 +1001,24 @@ function openBannerModal() {
     previewContainer.appendChild(countBadge);
 
     // Thumbnails
-    selectedFiles.forEach((file) => {
+    selectedFiles.forEach((file, index) => {
       const reader = new FileReader();
       reader.onload = (e) => {
+        const card = document.createElement('div');
+        card.className = 'banner-image-card';
+
         const img = document.createElement('img');
         img.src = e.target.result;
         img.className = 'banner-thumb';
         img.title = file.name;
-        previewContainer.appendChild(img);
+
+        const label = document.createElement('div');
+        label.className = 'banner-thumb-label';
+        label.textContent = `Image ${index + 1}`;
+
+        card.appendChild(img);
+        card.appendChild(label);
+        previewContainer.appendChild(card);
       };
       reader.readAsDataURL(file);
     });
