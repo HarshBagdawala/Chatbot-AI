@@ -189,6 +189,7 @@ body::after {
   font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
+  position: relative;
 }
 
 .sidebar-item:hover {
@@ -206,6 +207,50 @@ body::after {
   content: '💬';
   font-size: 14px;
   opacity: 0.6;
+}
+
+.sidebar-item-content {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.sidebar-item-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.sidebar-item:hover .sidebar-item-actions {
+  opacity: 1;
+}
+
+.sidebar-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  font-size: 12px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.1);
+}
+
+.share-btn:hover {
+  color: #3b82f6;
+}
+
+.delete-btn:hover {
+  color: #ef4444;
 }
 
 .sidebar-footer {

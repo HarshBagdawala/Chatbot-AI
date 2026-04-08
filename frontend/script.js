@@ -517,8 +517,39 @@ async function loadSessions() {
       data.sessions.forEach(session => {
         const item = document.createElement('div');
         item.className = `sidebar-item ${session.session_id === sessionId ? 'active' : ''}`;
-        item.textContent = session.title || 'New Chat';
-        item.onclick = () => selectSession(session.session_id);
+        
+        const itemContent = document.createElement('div');
+        itemContent.className = 'sidebar-item-content';
+        itemContent.textContent = session.title || 'New Chat';
+        itemContent.onclick = () => selectSession(session.session_id);
+        
+        const itemActions = document.createElement('div');
+        itemActions.className = 'sidebar-item-actions';
+        
+        const shareBtn = document.createElement('button');
+        shareBtn.className = 'sidebar-action-btn share-btn';
+        shareBtn.title = 'Share Chat';
+        shareBtn.innerHTML = '🔗';
+        shareBtn.onclick = (e) => {
+          e.stopPropagation();
+          shareChat(session.session_id);
+        };
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'sidebar-action-btn delete-btn';
+        deleteBtn.title = 'Delete Chat';
+        deleteBtn.innerHTML = '🗑️';
+        deleteBtn.onclick = (e) => {
+          e.stopPropagation();
+          deleteChat(session.session_id);
+        };
+        
+        itemActions.appendChild(shareBtn);
+        itemActions.appendChild(deleteBtn);
+        
+        item.appendChild(itemContent);
+        item.appendChild(itemActions);
+        
         sidebarHistory.appendChild(item);
       });
     } else {
@@ -686,6 +717,70 @@ async function sendMessage(isVoice = false) {
 function sendSuggestion(text) {
   userInput.value = text;
   sendMessage();
+}
+
+async function deleteChat(sessionId) {
+  if (!confirm('Are you sure you want to delete this chat? This action cannot be undone.')) return;
+  
+  try {
+    const res = await fetch(`/api/history/${sessionId}`, { method: 'DELETE' });
+    
+    if (res.ok) {
+      showToast('✅ Chat deleted successfully');
+      // If we're currently viewing this chat, start a new one
+      if (sessionId === window.sessionId) {
+        startNewChat();
+      } else {
+        loadSessions(); // Refresh the sidebar
+      }
+    } else {
+      throw new Error('Failed to delete chat');
+    }
+  } catch (err) {
+    console.error('Delete error:', err);
+    showToast('❌ Failed to delete chat');
+  }
+}
+
+async function shareChat(sessionId) {
+  try {
+    // Load the chat history
+    const res = await fetch(`/api/history/${sessionId}`);
+    const data = await res.json();
+    
+    if (!data.messages || data.messages.length === 0) {
+      showToast('❌ No messages to share');
+      return;
+    }
+    
+    // Format the chat for sharing
+    let shareText = '💬 AI Chat Conversation\n\n';
+    data.messages.forEach(msg => {
+      const role = msg.role === 'user' ? '👤 You' : '🤖 AI';
+      shareText += `${role}: ${msg.content}\n\n`;
+    });
+    
+    // Try to use the Web Share API if available
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'AI Chat Conversation',
+          text: shareText
+        });
+        return;
+      } catch (err) {
+        // User cancelled or share failed, fall back to clipboard
+      }
+    }
+    
+    // Fallback: Copy to clipboard
+    await navigator.clipboard.writeText(shareText);
+    showToast('✅ Chat copied to clipboard!');
+    
+  } catch (err) {
+    console.error('Share error:', err);
+    showToast('❌ Failed to share chat');
+  }
 }
 
 async function clearChat() {
