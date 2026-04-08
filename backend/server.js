@@ -166,7 +166,11 @@ async function searchProducts(query) {
         products.push({
           title: title,
           link: result.link,
-          snippet: result.snippet?.trim() || 'No description available'
+          image: result.image || 'https://via.placeholder.com/300x300?text=Product+Image',
+          price: result.price || 'Price not available',
+          description: result.snippet?.trim() || 'No description available',
+          source: result.source || 'Online Store',
+          rating: result.rating || null
         });
         seenTitles.add(title);
       }

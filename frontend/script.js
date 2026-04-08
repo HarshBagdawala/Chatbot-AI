@@ -718,11 +718,13 @@ async function sendMessage(isVoice = false) {
     .then(data => {
       hideTyping();
       if (data.products && data.products.length > 0) {
-        let reply = 'Here are some products I found:\n\n';
-        data.products.forEach(p => {
-          reply += `### ${p.title}\n${p.snippet}\n[View Product](${p.link})\n\n`;
-        });
-        appendMessage('assistant', reply);
+        appendMessage('assistant', '🛍️ Here are some products I found:', { rawHtml: false });
+        const carouselHtml = generateProductCarousel(data.products);
+        const div = document.createElement('div');
+        div.className = 'message assistant';
+        div.innerHTML = carouselHtml;
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
       } else {
         appendMessage('assistant', 'Sorry, I couldn\'t find any products matching your search.');
       }
@@ -1070,6 +1072,37 @@ function isProductSearch(message) {
   return keywords.some(k => message.toLowerCase().includes(k));
 }
 
+// ─── Product Carousel HTML Generator ────────────────────────────────────────
+function generateProductCarousel(products) {
+  if (!products || products.length === 0) return '';
+  
+  const carouselId = `carousel_${Date.now()}`;
+  const productCards = products.map(p => `
+    <div class="product-card">
+      <div class="product-image-wrapper">
+        <img src="${p.image}" alt="${p.title}" class="product-image" onerror="this.src='https://via.placeholder.com/300x300?text=Product'">
+        ${p.rating ? `<div class="product-rating">⭐ ${p.rating}</div>` : ''}
+      </div>
+      <div class="product-info">
+        <h4 class="product-title">${p.title}</h4>
+        <p class="product-description">${p.description}</p>
+        <div class="product-footer">
+          <span class="product-price">${p.price}</span>
+          <a href="${p.link}" target="_blank" class="product-link">View Product →</a>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  return `
+    <div class="products-carousel-container">
+      <div class="products-carousel" id="${carouselId}">
+        ${productCards}
+      </div>
+    </div>
+  `;
+}
+
 // ─── Smart Banner Maker Logic ────────────────────────────────────────────────
 let selectedFiles = [];
 
@@ -1099,11 +1132,13 @@ function handleImageSelection(event) {
       .then(data => {
         hideTyping();
         if (data.products && data.products.length > 0) {
-          let reply = 'Here are some products I found based on the image:\n\n';
-          data.products.forEach(p => {
-            reply += `### ${p.title}\n${p.snippet}\n[View Product](${p.link})\n\n`;
-          });
-          appendMessage('assistant', reply);
+          appendMessage('assistant', '🛍️ Here are some products I found based on the image:', { rawHtml: false });
+          const carouselHtml = generateProductCarousel(data.products);
+          const div = document.createElement('div');
+          div.className = 'message assistant';
+          div.innerHTML = carouselHtml;
+          chatBox.appendChild(div);
+          chatBox.scrollTop = chatBox.scrollHeight;
         } else {
           appendMessage('assistant', 'Sorry, I couldn\'t find any matching products for that image.');
         }
@@ -1234,11 +1269,13 @@ async function createBanner() {
         hideTyping();
         
         if (data.products && data.products.length > 0) {
-          let reply = 'Here are some similar products I found:\n\n';
-          data.products.forEach((p, i) => {
-            reply += `${i+1}. **${p.title}**\n   ${p.snippet}\n   [View Product](${p.link})\n\n`;
-          });
-          appendMessage('assistant', reply);
+          appendMessage('assistant', '🛍️ Here are some similar products I found:', { rawHtml: false });
+          const carouselHtml = generateProductCarousel(data.products);
+          const div = document.createElement('div');
+          div.className = 'message assistant';
+          div.innerHTML = carouselHtml;
+          chatBox.appendChild(div);
+          chatBox.scrollTop = chatBox.scrollHeight;
           showToast("✅ Products Found!");
         } else {
           appendMessage('assistant', 'Sorry, I couldn\'t find any matching products for that image.');
