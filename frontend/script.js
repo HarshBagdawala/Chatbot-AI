@@ -704,6 +704,11 @@ async function sendMessage(isVoice = false) {
   userInput.style.height = 'auto';
   sendBtn.disabled = true;
 
+  if (selectedFiles.length > 0) {
+    processImageRequest(msg, isNewSession);
+    return;
+  }
+
   appendMessage('user', msg);
   
   // Check if user is asking for product search
@@ -1115,180 +1120,96 @@ function generateProductCarousel(products) {
   `;
 }
 
-// ─── Smart Banner Maker Logic ────────────────────────────────────────────────
+// ─── Image Upload & Processing Logic ─────────────────────────────────────────
 let selectedFiles = [];
 
 function handleImageSelection(event) {
   const files = Array.from(event.target.files);
   if (files.length === 0) return;
 
-  if (isProductSearchMode) {
-    // Product search with image
-    isProductSearchMode = false;
-    document.getElementById('imageUploadInput').multiple = true; // Reset
-    document.getElementById('imageUploadInput').accept = 'image/*'; // Reset
-
-    const file = files[0];
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const imageUrl = e.target.result;
-      appendMessage('user', `🔍 Searching for products based on this image...`);
-      showTyping();
-
-      fetch('/api/product-search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl })
-      })
-      .then(res => res.json())
-      .then(data => {
-        hideTyping();
-        if (data.products && data.products.length > 0) {
-          appendMessage('assistant', '🛍️ Here are some products I found based on the image:', { rawHtml: false });
-          const carouselHtml = generateProductCarousel(data.products);
-          const div = document.createElement('div');
-          div.className = 'message assistant';
-          div.innerHTML = carouselHtml;
-          chatBox.appendChild(div);
-          chatBox.scrollTop = chatBox.scrollHeight;
-        } else {
-          appendMessage('assistant', 'Sorry, I couldn\'t find any matching products for that image.');
-        }
-      })
-      .catch(err => {
-        hideTyping();
-        showToast('❌ Error searching products');
-        console.error('Product search error:', err);
-      });
-    };
-    reader.readAsDataURL(file);
-    event.target.value = '';
-    return;
-  }
-  
-  if (files.length > 5) {
+  const totalFiles = selectedFiles.length + files.length;
+  if (totalFiles > 5) {
     showToast("⚠️ Maximum 5 images allowed.");
     event.target.value = '';
     return;
   }
   
-  selectedFiles = files;
-  openBannerModal();
+  // Append new files
+  selectedFiles = [...selectedFiles, ...files];
+  renderImagePreviews();
+  event.target.value = '';
 }
 
-function openBannerModal() {
-  // Populate image preview thumbnails
-  const previewContainer = document.getElementById('bannerImagePreviews');
-  if (previewContainer) {
-    previewContainer.innerHTML = '';
-
-    // Count badge
-    const countBadge = document.createElement('div');
-    countBadge.className = 'banner-img-count';
-    countBadge.textContent = `${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''} selected`;
-    previewContainer.appendChild(countBadge);
-
-    // Thumbnails
-    selectedFiles.forEach((file, index) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const card = document.createElement('div');
-        card.className = 'banner-image-card';
-
-        const img = document.createElement('img');
-        img.src = e.target.result;
-        img.className = 'banner-thumb';
-        img.title = file.name;
-
-        const label = document.createElement('div');
-        label.className = 'banner-thumb-label';
-        label.textContent = `Image ${index + 1}`;
-
-        card.appendChild(img);
-        card.appendChild(label);
-        previewContainer.appendChild(card);
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  // Set default mode
-  setMode('collage');
-
-  document.getElementById('bannerModal').classList.add('active');
-}
-
-function setMode(mode) {
-  const modeCards = document.querySelectorAll('.mode-card');
-  modeCards.forEach(card => card.classList.remove('active'));
+function renderImagePreviews() {
+  const previewContainer = document.getElementById('inputImagePreviews');
+  if (!previewContainer) return;
   
-  const activeCard = document.querySelector(`input[name="bannerMode"][value="${mode}"]`).closest('.mode-card');
-  activeCard.classList.add('active');
-
-  const sizeLabel = document.getElementById('sizeLabel');
-  const sizeOptions = document.getElementById('sizeOptions');
-  const promptContainer = document.querySelector('.banner-prompt-container');
-  const btnText = document.getElementById('btnCreateText');
-
-  if (mode === 'collage') {
-    sizeLabel.style.display = 'block';
-    sizeOptions.style.display = 'grid';
-    promptContainer.style.display = 'block';
-    btnText.textContent = '✨ Create Collage';
-  } else {
-    sizeLabel.style.display = 'none';
-    sizeOptions.style.display = 'none';
-    promptContainer.style.display = 'none';
-    btnText.textContent = '🔍 Find Products';
-  }
+  previewContainer.innerHTML = '';
+  
+  selectedFiles.forEach((file, index) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const item = document.createElement('div');
+      item.className = 'input-preview-item';
+      
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      img.title = file.name;
+      
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'input-preview-remove';
+      removeBtn.innerHTML = '✕';
+      removeBtn.title = 'Remove Image';
+      removeBtn.onclick = () => removeSelectedImage(index);
+      
+      item.appendChild(img);
+      item.appendChild(removeBtn);
+      previewContainer.appendChild(item);
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
-function closeBannerModal() {
-  document.getElementById('bannerModal').classList.remove('active');
-  document.getElementById('imageUploadInput').value = '';
-  const promptEl = document.getElementById('bannerPrompt');
-  if (promptEl) promptEl.value = '';
+function removeSelectedImage(index) {
+  selectedFiles.splice(index, 1);
+  renderImagePreviews();
+}
+
+async function processImageRequest(msg, isNewSession) {
+  if (selectedFiles.length === 0) return false;
+
+  const filesToProcess = [...selectedFiles];
+  // Clear previews visually immediately
   selectedFiles = [];
-}
-
-async function createBanner() {
-  if (selectedFiles.length === 0) return;
+  renderImagePreviews();
   
-  const mode = document.querySelector('input[name="bannerMode"]:checked').value;
-  
-  const btn = document.getElementById('btnCreateBanner');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span>⏳ Processing…</span>'; }
-
-  closeBannerModal();
-  
-  if (mode === 'search') {
-    // Product search mode
-    const file = selectedFiles[0]; // Use first image
+  // Check if it's a product search query explicitly OR if only 1 image and it seems like search
+  if (isProductSearch(msg) && filesToProcess.length === 1) {
+    const file = filesToProcess[0];
     const reader = new FileReader();
     reader.onload = async (e) => {
       const imageUrl = e.target.result;
-      appendMessage('user', `🔍 Finding products similar to this image…`);
+      appendMessage('user', msg || `🔍 Searching for products based on this image...`, { images: [imageUrl] });
       showTyping();
       
       try {
         const res = await fetch('/api/product-search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrl })
+          body: JSON.stringify({ imageUrl, query: msg })
         });
         
         const data = await res.json();
         hideTyping();
         
         if (data.products && data.products.length > 0) {
-          appendMessage('assistant', '🛍️ Here are some similar products I found:', { rawHtml: false });
+          appendMessage('assistant', '🛍️ Here are some products I found:', { rawHtml: false });
           const carouselHtml = generateProductCarousel(data.products);
           const div = document.createElement('div');
           div.className = 'message assistant';
           div.innerHTML = carouselHtml;
           chatBox.appendChild(div);
           chatBox.scrollTop = chatBox.scrollHeight;
-          showToast("✅ Products Found!");
         } else {
           appendMessage('assistant', 'Sorry, I couldn\'t find any matching products for that image.');
         }
@@ -1297,31 +1218,33 @@ async function createBanner() {
         showToast('❌ Error searching products');
         console.error('Product search error:', err);
       } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = '<span>🔍 Find Products</span>'; }
+        sendBtn.disabled = false;
+        userInput.focus();
       }
     };
     reader.readAsDataURL(file);
-    return;
+    return true;
   }
   
-  // Collage mode
-  const size = document.querySelector('input[name="bannerSize"]:checked').value;
-  const prompt = document.getElementById('bannerPrompt')?.value.trim() || '';
-  const filesToUpload = [...selectedFiles];
+  // Collage/Banner create mode
+  const size = 'landscape'; // Default to landscape for simplicity
+  const prompt = msg || '';
+  const imagePreviews = filesToProcess.map((file) => URL.createObjectURL(file));
   
-  const sizeLabel = { landscape: 'Landscape 1920×1080', square: 'Square 1080×1080', portrait: 'Portrait 1080×1920' }[size] || size;
-  const imagePreviews = filesToUpload.map((file) => URL.createObjectURL(file));
   appendMessage(
     'user',
-    `🎨 Creating a **${sizeLabel}** collage with **${filesToUpload.length}** image${filesToUpload.length > 1 ? 's' : ''}${prompt ? ` — "${prompt}"` : ''}…`,
+    msg || `🎨 Uploaded ${filesToProcess.length} image(s) for editing/merging`,
     { images: imagePreviews }
   );
   showTyping();
   
   const formData = new FormData();
-  filesToUpload.forEach((file) => formData.append('images', file, file.name));
+  filesToProcess.forEach((file) => formData.append('images', file, file.name));
   formData.append('size', size);
   formData.append('prompt', prompt);
+  // Default session info
+  if (sessionId) formData.append('session_id', sessionId);
+  if (currentUsername) formData.append('username', currentUsername);
   
   try {
     const res = await fetch('/api/banner/create', {
@@ -1332,20 +1255,31 @@ async function createBanner() {
     const data = await res.json();
     hideTyping();
     
-    if (!res.ok) throw new Error(data.error || "Upload failed");
+    if (!res.ok) throw new Error(data.error || "Image processing failed");
     
     const bannerUrl = data.bannerUrl.startsWith('data:') ? data.bannerUrl : `${window.location.origin}${data.bannerUrl}`;
-    const bannerMessage = `✨ **Your premium collage is ready!** [IMAGE_GEN: ${bannerUrl}]`;
+    const bannerMessage = `✨ **Here is your generated image!** [IMAGE_GEN: ${bannerUrl}]`;
     appendMessage('assistant', bannerMessage);
-    showToast("✅ Collage Created!");
+    
+    if (data.session_id && data.session_id !== sessionId) {
+       sessionId = data.session_id;
+       localStorage.setItem('chat_session_id', sessionId);
+    }
+    
+    // Refresh sidebar if it's new
+    if (isNewSession) loadSessions();
+    showToast("✅ Image Created!");
     
   } catch (err) {
     hideTyping();
     showToast("❌ " + err.message);
-    console.error("Banner create error:", err);
+    console.error("Image processing error:", err);
   } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '<span>✨ Create Collage</span>'; }
+    sendBtn.disabled = false;
+    userInput.focus();
   }
+  
+  return true;
 }
 
 
