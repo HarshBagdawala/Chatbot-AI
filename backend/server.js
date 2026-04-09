@@ -9,6 +9,7 @@ const { createClient } = require("@supabase/supabase-js");
 const Groq = require("groq-sdk");
 const { v4: uuidv4 } = require("uuid");
 const axios = require("axios");
+const { HfInference } = require("@huggingface/inference");
 
 const app = express();
 app.use(cors());
@@ -45,6 +46,7 @@ const upload = multer({
 
 // ─── Clients ────────────────────────────────────────────────────────────────
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const hf = process.env.HF_TOKEN ? new HfInference(process.env.HF_TOKEN) : null;
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -986,11 +988,40 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
         const finalPrompt = aiResponse.choices[0]?.message?.content?.trim() || `${imgDescription}, ${prompt}`;
         console.log(`[AI Editor] Generated Prompt: ${finalPrompt}`);
         
-        // 3. Call Pollinations AI
+        // 3. Try Real Image-to-Image with HuggingFace
+        if (hf) {
+          try {
+            console.log("[AI Editor] 🚀 Attempting True Image-to-Image via HuggingFace...");
+            const hfResponse = await hf.imageToImage({
+              model: "runwayml/stable-diffusion-v1-5", 
+              inputs: imageFiles[0].buffer,
+              parameters: {
+                prompt: finalPrompt,
+                negative_prompt: "blurry, low quality, distorted, deformed, ugly",
+                strength: 0.65, // Retain structure but apply enough style
+                guidance_scale: 7.5
+              }
+            });
+
+            if (hfResponse && hfResponse.size > 0) {
+              const buffer = Buffer.from(await hfResponse.arrayBuffer());
+              const base64 = buffer.toString('base64');
+              const hfImageUrl = `data:image/jpeg;base64,${base64}`;
+              console.log("[AI Editor] ✅ Success via HuggingFace!");
+              return res.json({ success: true, bannerUrl: hfImageUrl, isEdit: true });
+            }
+          } catch (hfErr) {
+            console.error("[AI Editor] ❌ HuggingFace Failed:", hfErr.message);
+            // Will fallback to Pollinations below
+          }
+        }
+
+        // 3. Fallback: Call Pollinations AI (Text-to-Image only)
+        console.log("[AI Editor] ⚠️ Falling back to Pollinations (Text-to-Image)...");
         const randomSeed = Math.floor(Math.random() * 1000000);
         const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=${targetWidth}&height=${targetHeight}&nologo=true&seed=${randomSeed}`;
         
-        console.log(`[AI Editor] ✅ Success URL: ${pollinationsUrl}`);
+        console.log(`[AI Editor] ✅ Fallback Success URL: ${pollinationsUrl}`);
         return res.json({ success: true, bannerUrl: pollinationsUrl, isEdit: true });
         
       } catch (aiEditError) {
