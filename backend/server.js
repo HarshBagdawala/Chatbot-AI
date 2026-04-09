@@ -116,7 +116,7 @@ async function performWebSearch(query) {
 }
 
 // ─── Product Search Functions ────────────────────────────────────────────────
-async function describeImage(imageUrl) {
+async function describeImage(imageUrl, instruction = 'Describe this image in detail, focusing on any products, items, or objects visible. Provide a concise description suitable for product search.') {
   try {
     const response = await axios.post('https://api.mistral.ai/v1/chat/completions', {
       model: 'pixtral-12b-2409',
@@ -124,7 +124,7 @@ async function describeImage(imageUrl) {
         {
           role: 'user',
           content: [
-            { type: 'text', text: 'Describe this image in detail, focusing on any products, items, or objects visible. Provide a concise description suitable for product search.' },
+            { type: 'text', text: instruction },
             { type: 'image_url', image_url: { url: imageUrl } }
           ]
         }
@@ -139,97 +139,11 @@ async function describeImage(imageUrl) {
     return response.data.choices[0].message.content.trim();
   } catch (error) {
     console.error('Image description error:', error.message);
-    return 'Unknown product from image';
+    return 'Unknown subject from image';
   }
 }
 
-async function searchProducts(query) {
-  try {
-    const response = await axios.post('https://google.serper.dev/shopping', {
-      q: query,
-      num: 20  // Get more results to filter better
-    }, {
-      headers: {
-        'X-API-KEY': process.env.SERPER_API_KEY,
-        'Content-Type': 'application/json'
-      }
-    });
 
-    const results = response.data.shopping || [];
-    console.log('[Product Search] Serper returned', results.length, 'results');
-    
-    const products = [];
-    const seenTitles = new Set();
-    const queryWords = query.toLowerCase().split(/\s+/);
-
-    for (const result of results) {
-      if (products.length >= 4) break;
-      
-      const title = result.title?.trim();
-      const price = result.price?.trim();
-      const image = result.image?.trim();
-      const snippet = result.snippet?.trim();
-      
-      // Skip if missing critical fields
-      if (!title || !price || !image || seenTitles.has(title)) {
-        continue;
-      }
-
-      // Skip if title contains non-product keywords
-      const titleLower = title.toLowerCase();
-      const blacklistKeywords = ['music', 'album', 'song', 'artist', 'soundtrack', 'ep', 'vinyl', 'book', 'ebook', 'journal', 'novel'];
-      if (blacklistKeywords.some(keyword => titleLower.includes(keyword))) {
-        console.log('[Product Search] Skipping non-product:', title);
-        continue;
-      }
-
-      // Check if at least one search keyword is in the title
-      const hasRelevantKeyword = queryWords.some(word => 
-        word.length > 2 && titleLower.includes(word)
-      );
-      
-      if (!hasRelevantKeyword && !titleLower.includes('product')) {
-        console.log('[Product Search] Skipping irrelevant:', title);
-        continue;
-      }
-
-      // Extract clean price
-      let cleanPrice = price;
-      const priceMatch = price.match(/[\d,]+\.?\d*/);
-      if (priceMatch) {
-        cleanPrice = priceMatch[0];
-      }
-
-      // Validate image URL (must be proper http/https URL)
-      if (!image.startsWith('http')) {
-        console.log('[Product Search] Skipping - invalid image URL:', title);
-        continue;
-      }
-
-      const product = {
-        title: title,
-        link: result.link || '#',
-        image: image,
-        price: cleanPrice,
-        description: snippet || 'Product available for purchase',
-        source: result.source || 'Online Store',
-        rating: result.rating || null
-      };
-      
-      console.log('[Product Search] Added product:', product.title, 'Price:', cleanPrice);
-      products.push(product);
-      seenTitles.add(title);
-    }
-
-    console.log('[Product Search] Final products count:', products.length);
-    return products;
-
-    return products;
-  } catch (error) {
-    console.error('Product search error:', error.message);
-    return [];
-  }
-}
 
 /*
 async function searchYoutubeOfficial(query) {
@@ -645,7 +559,7 @@ Key behavior rules:
 6. WEATHER: For ANY questions about weather, temperature, or forecasts for ANY city, region, or country globally, you MUST use the 'get_weather' tool. Do NOT guess or use old data. Always return a rich weather report with full live details, local time, temperature range, humidity, wind, visibility, sunrise/sunset, and a helpful tip. Always format the weather answer using Markdown-style headings, bold labels, and clear bullet lists. This must work for any city name the user provides. 🌦️
 7. WEB SEARCH: For other real-time news or general facts, use 'search_web'. 🔍
 8. IMAGE GENERATION: If the user asks to "generate", "create", "draw", or "make" an image, use the 'generate_image' tool. After the tool returns a URL, you MUST include the tag \`[IMAGE_GEN: url]\` in your final response to display it. 🎨
-9. PRODUCT SEARCH: If the user asks to "find", "search", "buy", "where to buy", or similar questions about products, items, or shopping, use the 'search_products' tool. Provide a clear product query like "wireless headphones" or "red dress". Always return a list of 4 different products with titles, links, and descriptions. 🛒
+
 
 You can help with: coding, science, history, general knowledge, math, creative writing, advice, and much more!`;
 
@@ -822,23 +736,7 @@ app.post("/api/chat", async (req, res) => {
           },
         },
       },
-      {
-        type: "function",
-        function: {
-          name: "search_products",
-          description: "Search for products online and return a list of 4 different products with titles, links, and descriptions.",
-          parameters: {
-            type: "object",
-            properties: {
-              query: {
-                type: "string",
-                description: "The product search query (e.g. 'wireless headphones', 'red dress').",
-              },
-            },
-            required: ["query"],
-          },
-        },
-      },
+
     ];
 
     // 3. Call Groq API
@@ -878,15 +776,6 @@ app.post("/api/chat", async (req, res) => {
           const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(args.prompt)}?width=1024&height=1024&nologo=true&seed=${randomSeed}`;
           toolResults = `Successfully generated the image. Tell the user you've created it and MUST include this exact tag in your response: [IMAGE_GEN: ${imageUrl}]`;
           console.log(`Generated Image URL: ${imageUrl}`);
-        } else if (toolCall.function.name === 'search_products') {
-          const args = JSON.parse(toolCall.function.arguments);
-          console.log(`Searching products for: ${args.query}`);
-          const products = await searchProducts(args.query);
-          if (products.length > 0) {
-            toolResults = "Found the following products:\n" + products.map((p, i) => `${i+1}. **${p.title}**\n   Link: ${p.link}\n   ${p.snippet}`).join('\n\n');
-          } else {
-            toolResults = "No products found for the search query.";
-          }
         }
         
         messages.push({
@@ -1057,7 +946,45 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
 
     const count = imageFiles.length;
 
-    // ── 1. Generate AI Caption ──────────────────────────────────────────────────
+    // ── 0. AI Editor Branch (Single Image Edit) ─────────────────────────────
+    if (count === 1 && prompt) {
+      console.log("[AI Editor] Single uploaded image detected. Routing to AI Edit mode.");
+      try {
+        const mimeType = imageFiles[0].mimetype;
+        const base64Img = imageFiles[0].buffer.toString('base64');
+        const imageUrl = `data:${mimeType};base64,${base64Img}`;
+        
+        // 1. Analyze original image
+        const imgDescription = await describeImage(imageUrl, "Briefly describe the primary subject, character, or object in this image. Do not mention the act of describing it. Just state what the subject is. Keep it under 2 sentences.");
+        console.log(`[AI Editor] Mistral Description: ${imgDescription}`);
+        
+        // 2. Generate new text prompt for the image
+        const aiResponse = await groq.chat.completions.create({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            { role: "system", content: "You are an expert stable-diffusion prompt engineer. The user wants to edit an image. You are given the current image description and the user's prompt. Merging them, generate ONE highly detailed, comma-separated image generation prompt to create the final desired image. The new prompt must retain the main subject but apply the user's edits. Return ONLY the prompt text without any quotes or conversational fillers." },
+            { role: "user", content: `Original Image Subject: ${imgDescription}\nUser Edit Request: ${prompt}` }
+          ],
+          max_tokens: 150
+        });
+        
+        const finalPrompt = aiResponse.choices[0]?.message?.content?.trim() || `${imgDescription}, ${prompt}`;
+        console.log(`[AI Editor] Generated Prompt: ${finalPrompt}`);
+        
+        // 3. Call Pollinations AI
+        const randomSeed = Math.floor(Math.random() * 1000000);
+        const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=${targetWidth}&height=${targetHeight}&nologo=true&seed=${randomSeed}`;
+        
+        console.log(`[AI Editor] ✅ Success URL: ${pollinationsUrl}`);
+        return res.json({ success: true, bannerUrl: pollinationsUrl, isEdit: true });
+        
+      } catch (aiEditError) {
+        console.error("AI Editing Error:", aiEditError.message);
+        // Fallback: If AI edit fails, falls through to the normal single-image layout maker below
+      }
+    }
+
+    // ── 1. Generate AI Caption (Collage Mode) ────────────────────────────────
     let smartCaption = "";
     if (prompt) {
       try {
@@ -1241,28 +1168,6 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
   }
 });
 
-// ─── Product Search ──────────────────────────────────────────────────────────
-app.post('/api/product-search', async (req, res) => {
-  try {
-    const { query, imageUrl } = req.body;
-    let searchQuery = query;
-
-    if (imageUrl) {
-      console.log('[Product Search] Analyzing image...');
-      searchQuery = await describeImage(imageUrl);
-      console.log('[Product Search] Image description:', searchQuery);
-    }
-
-    console.log('[Product Search] Searching for:', searchQuery);
-    const products = await searchProducts(searchQuery);
-    
-    console.log('[Product Search] Final Response:', JSON.stringify(products, null, 2));
-    res.json({ products, success: true });
-  } catch (error) {
-    console.error('Product search API error:', error.message);
-    res.status(500).json({ error: 'Failed to search products', details: error.message });
-  }
-});
 
 // Health check
 app.get("/api/health", (req, res) => {

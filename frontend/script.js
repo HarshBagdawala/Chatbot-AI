@@ -15,13 +15,13 @@ function toggleAuthMode() {
   isLoginMode = !isLoginMode;
   const btn = document.getElementById('submitAuthBtn');
   const toggleText = document.getElementById('authToggleText');
-  
+
   if (isLoginMode) {
-    if(btn) btn.textContent = 'Sign In';
-    if(toggleText) toggleText.innerHTML = `Don't have an account? <a href="#" onclick="toggleAuthMode()">Sign up</a>`;
+    if (btn) btn.textContent = 'Sign In';
+    if (toggleText) toggleText.innerHTML = `Don't have an account? <a href="#" onclick="toggleAuthMode()">Sign up</a>`;
   } else {
-    if(btn) btn.textContent = 'Create Account';
-    if(toggleText) toggleText.innerHTML = `Already have an account? <a href="#" onclick="toggleAuthMode()">Sign in</a>`;
+    if (btn) btn.textContent = 'Create Account';
+    if (toggleText) toggleText.innerHTML = `Already have an account? <a href="#" onclick="toggleAuthMode()">Sign in</a>`;
   }
 }
 
@@ -35,18 +35,18 @@ function updateProfileUI() {
 function checkAuth() {
   const overlay = document.getElementById('loginOverlay');
   const appContainer = document.getElementById('appContainer');
-  
+
   if (currentUsername) {
-    if(overlay) overlay.classList.remove('active');
-    if(appContainer) appContainer.style.display = 'flex';
-    if(sidebar) sidebar.style.display = 'flex'; // Ensure sidebar behaves normally
-    
+    if (overlay) overlay.classList.remove('active');
+    if (appContainer) appContainer.style.display = 'flex';
+    if (sidebar) sidebar.style.display = 'flex'; // Ensure sidebar behaves normally
+
     updateProfileUI();
 
     if (currentUsername !== 'guest') {
       loadSessions();
     } else {
-      if(sidebarHistory) sidebarHistory.innerHTML = '<div style="padding:20px; font-size:12px; color:var(--text-muted); text-align:center;">Guest history not saved</div>';
+      if (sidebarHistory) sidebarHistory.innerHTML = '<div style="padding:20px; font-size:12px; color:var(--text-muted); text-align:center;">Guest history not saved</div>';
     }
 
     if (sessionId) {
@@ -55,15 +55,15 @@ function checkAuth() {
       showWelcome();
     }
   } else {
-    if(overlay) overlay.classList.add('active');
-    if(appContainer) appContainer.style.display = 'none';
+    if (overlay) overlay.classList.add('active');
+    if (appContainer) appContainer.style.display = 'none';
   }
 }
 
 async function handleAuth() {
   const username = document.getElementById('usernameInput')?.value.trim();
   const password = document.getElementById('passwordInput')?.value.trim();
-  
+
   if (!username || !password) {
     showToast("⚠️ Please enter username and password.");
     return;
@@ -77,13 +77,13 @@ async function handleAuth() {
       body: JSON.stringify({ username, password })
     });
     const data = await res.json();
-    
+
     if (!res.ok) throw new Error(data.error || 'Authentication failed');
 
     if (!isLoginMode) {
       showToast("✅ Registered! Please sign in.");
       toggleAuthMode();
-      return; 
+      return;
     }
 
     currentUsername = username;
@@ -109,16 +109,16 @@ function handleLogout() {
   sessionId = null;
   localStorage.removeItem('chat_username');
   localStorage.removeItem('chat_session_id');
-  if(document.getElementById('usernameInput')) document.getElementById('usernameInput').value = '';
-  if(document.getElementById('passwordInput')) document.getElementById('passwordInput').value = '';
+  if (document.getElementById('usernameInput')) document.getElementById('usernameInput').value = '';
+  if (document.getElementById('passwordInput')) document.getElementById('passwordInput').value = '';
   checkAuth();
 }
 
 // Enter key for auth
 const passwordInput = document.getElementById('passwordInput');
-if(passwordInput) {
+if (passwordInput) {
   passwordInput.addEventListener('keydown', (e) => {
-    if(e.key === 'Enter') handleAuth();
+    if (e.key === 'Enter') handleAuth();
   });
 }
 
@@ -131,10 +131,10 @@ const micBtn = document.getElementById('micBtn');
 function toggleAIVoice() {
   aiVoiceEnabled = !aiVoiceEnabled;
   if (aiVoiceEnabled) {
-    if(voiceToggleBtn) voiceToggleBtn.classList.add('active');
+    if (voiceToggleBtn) voiceToggleBtn.classList.add('active');
     showToast('🔊 AI Voice Enabled');
   } else {
-    if(voiceToggleBtn) voiceToggleBtn.classList.remove('active');
+    if (voiceToggleBtn) voiceToggleBtn.classList.remove('active');
     window.speechSynthesis.cancel();
     showToast('🔇 AI Voice Muted');
   }
@@ -152,10 +152,10 @@ if ('speechSynthesis' in window) {
 function getFemaleVoice() {
   if (!availableVoices.length) availableVoices = window.speechSynthesis.getVoices();
   // Attempt to find a female voice for Hindi or English
-  return availableVoices.find(v => 
-    v.name.includes('Female') || 
-    v.name.includes('Zira') || 
-    v.name.includes('Samantha') || 
+  return availableVoices.find(v =>
+    v.name.includes('Female') ||
+    v.name.includes('Zira') ||
+    v.name.includes('Samantha') ||
     v.name.includes('Victoria') ||
     v.name.includes('Aditi') || // Indian Female
     (v.lang.includes('hi-IN') && !v.name.includes('Male'))
@@ -168,7 +168,7 @@ function speakText(text) {
   // Remove markdown formatting to improve pronunciation
   let cleanText = text.replace(/```[\s\S]*?```/g, ' Code snippet. ').replace(/[_*`#]/g, '');
   const utterance = new SpeechSynthesisUtterance(cleanText);
-  
+
   const femaleVoice = getFemaleVoice();
   if (femaleVoice) {
     utterance.voice = femaleVoice;
@@ -176,7 +176,7 @@ function speakText(text) {
   } else {
     utterance.lang = navigator.language || 'en-US';
   }
-  
+
   if (!femaleVoice || !femaleVoice.name.match(/female|zira|samantha|aditi/i)) {
     utterance.pitch = 1.2; // Fallback to make custom voices sound slightly more feminine
   }
@@ -191,12 +191,12 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
   recognition = new SpeechRecognition();
   recognition.continuous = false;
   // Detect spoken language automatically based on browser locale
-  recognition.lang = navigator.language || 'en-US'; 
+  recognition.lang = navigator.language || 'en-US';
   recognition.interimResults = false;
 
   recognition.onstart = () => {
     isRecording = true;
-    if(micBtn) micBtn.classList.add('listening');
+    if (micBtn) micBtn.classList.add('listening');
     userInput.placeholder = "Listening...";
   };
 
@@ -205,7 +205,7 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     userInput.value += (userInput.value ? ' ' : '') + transcript;
     userInput.value = userInput.value.trim();
     // Auto send the message when speech finishes, pass true to indicate voice triggered
-    sendMessage(true); 
+    sendMessage(true);
   };
 
   recognition.onerror = (evt) => {
@@ -225,8 +225,8 @@ function toggleRecording() {
 
 function stopRecording() {
   isRecording = false;
-  if(micBtn) micBtn.classList.remove('listening');
-  if(userInput) userInput.placeholder = "Ask me anything...";
+  if (micBtn) micBtn.classList.remove('listening');
+  if (userInput) userInput.placeholder = "Ask me anything...";
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -339,7 +339,7 @@ function appendMessage(role, content, options = {}) {
   if (imageMatch) {
     const imageUrl = imageMatch[1].trim();
     formatted = formatted.replace(/\[IMAGE_GEN:.*?\]/gi, '').trim();
-    
+
     const randomId = 'img_' + Math.random().toString(36).substr(2, 9);
     imageHTML = `
       <div class="generated-image-card">
@@ -508,22 +508,22 @@ function sendEditedMessage(content) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: content, session_id: sessionId, username: currentUsername })
   })
-  .then(res => res.json())
-  .then(data => {
-    hideTyping();
-    if (data.error) {
-      showToast('❌ ' + data.error);
-      return;
-    }
-    sessionId = data.session_id;
-    localStorage.setItem('chat_session_id', sessionId);
-    appendMessage('assistant', data.reply);
-    if (currentUsername !== 'guest') loadSessions();
-  })
-  .catch(err => {
-    hideTyping();
-    showToast('❌ Network error');
-  });
+    .then(res => res.json())
+    .then(data => {
+      hideTyping();
+      if (data.error) {
+        showToast('❌ ' + data.error);
+        return;
+      }
+      sessionId = data.session_id;
+      localStorage.setItem('chat_session_id', sessionId);
+      appendMessage('assistant', data.reply);
+      if (currentUsername !== 'guest') loadSessions();
+    })
+    .catch(err => {
+      hideTyping();
+      showToast('❌ Network error');
+    });
 }
 
 function showTyping() {
@@ -563,22 +563,22 @@ async function loadSessions() {
   try {
     const res = await fetch(`/api/sessions?username=${encodeURIComponent(currentUsername)}`);
     const data = await res.json();
-    
+
     sidebarHistory.innerHTML = '';
-    
+
     if (data.sessions && data.sessions.length > 0) {
       data.sessions.forEach(session => {
         const item = document.createElement('div');
         item.className = `sidebar-item ${session.session_id === sessionId ? 'active' : ''}`;
-        
+
         const itemContent = document.createElement('div');
         itemContent.className = 'sidebar-item-content';
         itemContent.textContent = session.title || 'New Chat';
         itemContent.onclick = () => selectSession(session.session_id);
-        
+
         const itemActions = document.createElement('div');
         itemActions.className = 'sidebar-item-actions';
-        
+
         const shareBtn = document.createElement('button');
         shareBtn.className = 'sidebar-action-btn share-btn';
         shareBtn.title = 'Share Chat';
@@ -587,7 +587,7 @@ async function loadSessions() {
           e.stopPropagation();
           shareChat(session.session_id);
         };
-        
+
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'sidebar-action-btn delete-btn';
         deleteBtn.title = 'Delete Chat';
@@ -596,13 +596,13 @@ async function loadSessions() {
           e.stopPropagation();
           deleteChat(session.session_id);
         };
-        
+
         itemActions.appendChild(shareBtn);
         itemActions.appendChild(deleteBtn);
-        
+
         item.appendChild(itemContent);
         item.appendChild(itemActions);
-        
+
         sidebarHistory.appendChild(item);
       });
     } else {
@@ -618,7 +618,7 @@ async function loadHistory(id) {
     const res = await fetch(`/api/history/${id}`);
     const data = await res.json();
     hideTyping();
-    
+
     if (data.messages && data.messages.length > 0) {
       data.messages.forEach(m => appendMessage(m.role, m.content));
       messageIndex = data.messages.length;
@@ -634,18 +634,18 @@ async function loadHistory(id) {
 
 async function selectSession(id) {
   if (id === sessionId) return;
-  
+
   sessionId = id;
   localStorage.setItem('chat_session_id', sessionId);
-  
+
   // Close sidebar on mobile
-  if(sidebar) sidebar.classList.remove('open');
-  if(overlay) overlay.classList.remove('show');
-  
+  if (sidebar) sidebar.classList.remove('open');
+  if (overlay) overlay.classList.remove('show');
+
   // Clear UI and load history
   chatBox.innerHTML = '';
   showTyping();
-  
+
   loadHistory(sessionId);
 }
 
@@ -656,7 +656,7 @@ function startNewChat() {
   chatBox.innerHTML = '';
   showWelcome();
   loadSessions();
-  
+
   // Close sidebar on mobile
   sidebar.classList.remove('open');
   overlay.classList.remove('show');
@@ -689,7 +689,7 @@ function isImageUploadRequest(message) {
     'make collage', 'merge image', 'combine image', 'build banner',
     'design banner', 'select photo', 'choose photo'
   ];
-  
+
   const lowerMessage = message.toLowerCase();
   return uploadKeywords.some(keyword => lowerMessage.includes(keyword));
 }
@@ -710,44 +710,9 @@ async function sendMessage(isVoice = false) {
   }
 
   appendMessage('user', msg);
-  
-  // Check if user is asking for product search
-  if (isProductSearch(msg)) {
-    showTyping();
-    fetch('/api/product-search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: msg })
-    })
-    .then(res => res.json())
-    .then(data => {
-      hideTyping();
-      console.log('[Frontend] Product search response:', data);
-      
-      if (data.products && data.products.length > 0) {
-        appendMessage('assistant', '🛍️ Here are some products I found:', { rawHtml: false });
-        const carouselHtml = generateProductCarousel(data.products);
-        console.log('[Frontend] Generated carousel HTML:', carouselHtml);
-        
-        const div = document.createElement('div');
-        div.className = 'message assistant';
-        div.innerHTML = carouselHtml;
-        chatBox.appendChild(div);
-        chatBox.scrollTop = chatBox.scrollHeight;
-      } else {
-        appendMessage('assistant', 'Sorry, I couldn\'t find any products matching your search.');
-      }
-    })
-    .catch(err => {
-      hideTyping();
-      showToast('❌ Error searching products');
-      console.error('Product search error:', err);
-    });
-    sendBtn.disabled = false;
-    userInput.focus();
-    return;
-  }
-  
+
+
+
   // Check if user is asking to upload/create images
   if (isImageUploadRequest(msg)) {
     showToast('📸 Click the attachment button or select images!');
@@ -773,7 +738,7 @@ async function sendMessage(isVoice = false) {
 
     let aiReply = data.reply;
     let musicRequested = null;
-    
+
     // Parse [PLAY_MUSIC: song_name]
     const musicMatch = aiReply.match(/\[PLAY_MUSIC:\s*(.*?)\]/i);
     if (musicMatch) {
@@ -785,16 +750,16 @@ async function sendMessage(isVoice = false) {
     sessionId = data.session_id;
     localStorage.setItem('chat_session_id', sessionId);
     appendMessage('assistant', aiReply);
-    
+
     // Speak the response using Voice AI ONLY if user sent via voice
     if (isVoice) {
       speakText(aiReply);
     }
-    
+
     if (musicRequested) {
       playMusicCommand(musicRequested);
     }
-    
+
     // Refresh sidebar if it's the first message of a session
     if (isNewSession) {
       loadSessions();
@@ -816,10 +781,10 @@ function sendSuggestion(text) {
 
 async function deleteChat(sessionId) {
   if (!confirm('Are you sure you want to delete this chat? This action cannot be undone.')) return;
-  
+
   try {
     const res = await fetch(`/api/history/${sessionId}`, { method: 'DELETE' });
-    
+
     if (res.ok) {
       showToast('✅ Chat deleted successfully');
       // If we're currently viewing this chat, start a new one
@@ -842,19 +807,19 @@ async function shareChat(sessionId) {
     // Load the chat history
     const res = await fetch(`/api/history/${sessionId}`);
     const data = await res.json();
-    
+
     if (!data.messages || data.messages.length === 0) {
       showToast('❌ No messages to share');
       return;
     }
-    
+
     // Format the chat for sharing
     let shareText = '💬 AI Chat Conversation\n\n';
     data.messages.forEach(msg => {
       const role = msg.role === 'user' ? '👤 You' : '🤖 AI';
       shareText += `${role}: ${msg.content}\n\n`;
     });
-    
+
     // Try to use the Web Share API if available
     if (navigator.share) {
       try {
@@ -867,11 +832,11 @@ async function shareChat(sessionId) {
         // User cancelled or share failed, fall back to clipboard
       }
     }
-    
+
     // Fallback: Copy to clipboard
     await navigator.clipboard.writeText(shareText);
     showToast('✅ Chat copied to clipboard!');
-    
+
   } catch (err) {
     console.error('Share error:', err);
     showToast('❌ Failed to share chat');
@@ -884,7 +849,7 @@ async function clearChat() {
   if (sessionId) {
     try {
       await fetch(`/api/history/${sessionId}`, { method: 'DELETE' });
-    } catch (e) {}
+    } catch (e) { }
   }
 
   startNewChat();
@@ -896,11 +861,11 @@ async function clearChat() {
 window.copyToClipboard = (btn) => {
   const wrapper = btn.closest('.code-block-wrapper');
   const code = wrapper.querySelector('code').innerText;
-  
+
   navigator.clipboard.writeText(code).then(() => {
     const btnText = btn.querySelector('span');
     const originalHTML = btn.innerHTML;
-    
+
     btn.classList.add('copied');
     btn.innerHTML = `
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -908,7 +873,7 @@ window.copyToClipboard = (btn) => {
       </svg>
       <span>Copied!</span>
     `;
-    
+
     setTimeout(() => {
       btn.classList.remove('copied');
       btn.innerHTML = originalHTML;
@@ -934,7 +899,7 @@ function toggleThemeMenu(e) {
 function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem('chat_theme', theme);
-  
+
   // Update active state in menu
   themeOptions.forEach(opt => {
     if (opt.dataset.theme === theme) {
@@ -1005,12 +970,12 @@ function onPlayerReady(event) {
 function onPlayerStateChange(event) {
   if (event.data == YT.PlayerState.PLAYING) {
     isMusicPlaying = true;
-    if(musicIcon) musicIcon.classList.add('spin');
-    if(playIconPath) playIconPath.setAttribute('d', 'M6 19h4V5H6v14zm8-14v14h4V5h-4z'); 
+    if (musicIcon) musicIcon.classList.add('spin');
+    if (playIconPath) playIconPath.setAttribute('d', 'M6 19h4V5H6v14zm8-14v14h4V5h-4z');
   } else if (event.data == YT.PlayerState.PAUSED || event.data == YT.PlayerState.ENDED) {
     isMusicPlaying = false;
-    if(musicIcon) musicIcon.classList.remove('spin');
-    if(playIconPath) playIconPath.setAttribute('d', 'M8 5v14l11-7z');
+    if (musicIcon) musicIcon.classList.remove('spin');
+    if (playIconPath) playIconPath.setAttribute('d', 'M8 5v14l11-7z');
   }
 }
 
@@ -1024,19 +989,19 @@ async function playMusicCommand(songName) {
     showToast('⚠️ Music Player loading... Try again in a few seconds.');
     return;
   }
-  
-  if(musicTitle) musicTitle.textContent = 'Searching...';
-  if(musicPlayerContainer) musicPlayerContainer.classList.remove('disabled');
-  
+
+  if (musicTitle) musicTitle.textContent = 'Searching...';
+  if (musicPlayerContainer) musicPlayerContainer.classList.remove('disabled');
+
   try {
     const res = await fetch(`/api/music/search?q=${encodeURIComponent(songName)}`);
     const data = await res.json();
-    
+
     if (!res.ok || !data.videoId) {
       throw new Error(data.error || 'Music not found');
     }
 
-    if(musicTitle) musicTitle.textContent = songName;
+    if (musicTitle) musicTitle.textContent = songName;
     ytPlayer.unMute();
     ytPlayer.loadVideoById(data.videoId);
     // Explicitly call play if it doesn't start
@@ -1066,60 +1031,6 @@ function closeMusic() {
   if (musicPlayerContainer) musicPlayerContainer.classList.add('disabled');
 }
 
-// ─── Product Search ──────────────────────────────────────────────────────────
-let isProductSearchMode = false;
-
-function openProductSearch() {
-  isProductSearchMode = true;
-  document.getElementById('imageUploadInput').accept = 'image/*';
-  document.getElementById('imageUploadInput').multiple = false;
-  document.getElementById('imageUploadInput').click();
-}
-
-function isProductSearch(message) {
-  const keywords = ['find product', 'search product', 'buy', 'price', 'where to buy', 'product', 'shopping'];
-  return keywords.some(k => message.toLowerCase().includes(k));
-}
-
-// ─── Product Carousel HTML Generator ────────────────────────────────────────
-function generateProductCarousel(products) {
-  if (!products || products.length === 0) return '';
-  
-  const carouselId = `carousel_${Date.now()}`;
-  const productCards = products.map(p => {
-    const imageUrl = p.image && p.image.trim() ? p.image : 'https://via.placeholder.com/300x300?text=No+Image';
-    const title = p.title || 'Unknown Product';
-    const price = p.price || 'Price not available';
-    const description = p.description || 'No description available';
-    const link = p.link || '#';
-    
-    return `
-    <div class="product-card">
-      <div class="product-image-wrapper">
-        <img src="${imageUrl}" alt="${title}" class="product-image" onerror="this.src='https://via.placeholder.com/300x300?text=No+Image'" loading="lazy">
-        ${p.rating ? `<div class="product-rating">⭐ ${p.rating}</div>` : ''}
-      </div>
-      <div class="product-info">
-        <h4 class="product-title">${title}</h4>
-        <p class="product-description">${description}</p>
-        <div class="product-footer">
-          <span class="product-price">₹${price}</span>
-          <a href="${link}" target="_blank" class="product-link">View →</a>
-        </div>
-      </div>
-    </div>
-    `;
-  }).join('');
-
-  return `
-    <div class="products-carousel-container">
-      <div class="products-carousel" id="${carouselId}">
-        ${productCards}
-      </div>
-    </div>
-  `;
-}
-
 // ─── Image Upload & Processing Logic ─────────────────────────────────────────
 let selectedFiles = [];
 
@@ -1133,7 +1044,7 @@ function handleImageSelection(event) {
     event.target.value = '';
     return;
   }
-  
+
   // Append new files
   selectedFiles = [...selectedFiles, ...files];
   renderImagePreviews();
@@ -1143,25 +1054,25 @@ function handleImageSelection(event) {
 function renderImagePreviews() {
   const previewContainer = document.getElementById('inputImagePreviews');
   if (!previewContainer) return;
-  
+
   previewContainer.innerHTML = '';
-  
+
   selectedFiles.forEach((file, index) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const item = document.createElement('div');
       item.className = 'input-preview-item';
-      
+
       const img = document.createElement('img');
       img.src = e.target.result;
       img.title = file.name;
-      
+
       const removeBtn = document.createElement('button');
       removeBtn.className = 'input-preview-remove';
       removeBtn.innerHTML = '✕';
       removeBtn.title = 'Remove Image';
       removeBtn.onclick = () => removeSelectedImage(index);
-      
+
       item.appendChild(img);
       item.appendChild(removeBtn);
       previewContainer.appendChild(item);
@@ -1182,62 +1093,25 @@ async function processImageRequest(msg, isNewSession) {
   // Clear previews visually immediately
   selectedFiles = [];
   renderImagePreviews();
-  
-  // Check if it's a product search query explicitly OR if only 1 image and it seems like search
-  if (isProductSearch(msg) && filesToProcess.length === 1) {
-    const file = filesToProcess[0];
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const imageUrl = e.target.result;
-      appendMessage('user', msg || `🔍 Searching for products based on this image...`, { images: [imageUrl] });
-      showTyping();
-      
-      try {
-        const res = await fetch('/api/product-search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrl, query: msg })
-        });
-        
-        const data = await res.json();
-        hideTyping();
-        
-        if (data.products && data.products.length > 0) {
-          appendMessage('assistant', '🛍️ Here are some products I found:', { rawHtml: false });
-          const carouselHtml = generateProductCarousel(data.products);
-          const div = document.createElement('div');
-          div.className = 'message assistant';
-          div.innerHTML = carouselHtml;
-          chatBox.appendChild(div);
-          chatBox.scrollTop = chatBox.scrollHeight;
-        } else {
-          appendMessage('assistant', 'Sorry, I couldn\'t find any matching products for that image.');
-        }
-      } catch (err) {
-        hideTyping();
-        showToast('❌ Error searching products');
-        console.error('Product search error:', err);
-      } finally {
-        sendBtn.disabled = false;
-        userInput.focus();
-      }
-    };
-    reader.readAsDataURL(file);
-    return true;
-  }
-  
-  // Collage/Banner create mode
-  const size = 'landscape'; // Default to landscape for simplicity
+
+
+
+  // Application Mode (1 image = AI Edit, >1 image = Collage)
+  const size = 'landscape';
   const prompt = msg || '';
   const imagePreviews = filesToProcess.map((file) => URL.createObjectURL(file));
-  
-  appendMessage(
-    'user',
-    msg || `🎨 Uploaded ${filesToProcess.length} image(s) for editing/merging`,
-    { images: imagePreviews }
-  );
+
+  let actionText = filesToProcess.length === 1
+    ? `🎨 Applying AI edits to your image...`
+    : `🎨 Creating a collage with ${filesToProcess.length} images...`;
+
+  if (msg) {
+    actionText = msg; // User typed a msg, no need to overwrite it
+  }
+
+  appendMessage('user', actionText, { images: imagePreviews });
   showTyping();
-  
+
   const formData = new FormData();
   filesToProcess.forEach((file) => formData.append('images', file, file.name));
   formData.append('size', size);
@@ -1245,31 +1119,31 @@ async function processImageRequest(msg, isNewSession) {
   // Default session info
   if (sessionId) formData.append('session_id', sessionId);
   if (currentUsername) formData.append('username', currentUsername);
-  
+
   try {
     const res = await fetch('/api/banner/create', {
       method: 'POST',
       body: formData
     });
-    
+
     const data = await res.json();
     hideTyping();
-    
+
     if (!res.ok) throw new Error(data.error || "Image processing failed");
-    
+
     const bannerUrl = data.bannerUrl.startsWith('data:') ? data.bannerUrl : `${window.location.origin}${data.bannerUrl}`;
     const bannerMessage = `✨ **Here is your generated image!** [IMAGE_GEN: ${bannerUrl}]`;
     appendMessage('assistant', bannerMessage);
-    
+
     if (data.session_id && data.session_id !== sessionId) {
-       sessionId = data.session_id;
-       localStorage.setItem('chat_session_id', sessionId);
+      sessionId = data.session_id;
+      localStorage.setItem('chat_session_id', sessionId);
     }
-    
+
     // Refresh sidebar if it's new
     if (isNewSession) loadSessions();
     showToast("✅ Image Created!");
-    
+
   } catch (err) {
     hideTyping();
     showToast("❌ " + err.message);
@@ -1278,7 +1152,7 @@ async function processImageRequest(msg, isNewSession) {
     sendBtn.disabled = false;
     userInput.focus();
   }
-  
+
   return true;
 }
 
