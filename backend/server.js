@@ -45,11 +45,7 @@ const upload = multer({
 });
 
 // ─── Clients ────────────────────────────────────────────────────────────────
-if (process.env.HF_TOKEN) {
-  console.log(`[System] HF_TOKEN detected (starts with: ${process.env.HF_TOKEN.substring(0, 5)}...)`);
-} else {
-  console.warn(`[System] ⚠️ HF_TOKEN is NOT set in .env! Image-to-Image editing will be disabled.`);
-}
+
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const hf = process.env.HF_TOKEN ? new HfInference(process.env.HF_TOKEN.trim()) : null;
@@ -1262,6 +1258,13 @@ if (require.main === module) {
     console.log(`\x1b[32m📦 Supabase connected: ✅ [URL: ${process.env.SUPABASE_URL}] \x1b[0m`);
     console.log(`\x1b[33m🔑 Supabase Key: ${maskToken(process.env.SUPABASE_ANON_KEY)}\x1b[0m`);
     console.log(`\x1b[35m🧠 Groq API: ✅ [Key: ${maskToken(process.env.GROQ_API_KEY)}]\x1b[0m`);
+    
+    if (process.env.HF_TOKEN) {
+      console.log(`\x1b[34m🖼️  HuggingFace: ✅ [Token Detected: ${maskToken(process.env.HF_TOKEN)}]\x1b[0m`);
+    } else {
+      console.log(`\x1b[31m🖼️  HuggingFace: ❌ [Token NOT Set in .env]\x1b[0m`);
+    }
+
     console.log(`\n\x1b[90mSecurity Info: No API keys are exposed to the frontend/browser inspect tools.\x1b[0m\n`);
   });
 }
