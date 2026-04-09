@@ -45,8 +45,14 @@ const upload = multer({
 });
 
 // ─── Clients ────────────────────────────────────────────────────────────────
+if (process.env.HF_TOKEN) {
+  console.log(`[System] HF_TOKEN detected (starts with: ${process.env.HF_TOKEN.substring(0, 5)}...)`);
+} else {
+  console.warn(`[System] ⚠️ HF_TOKEN is NOT set in .env! Image-to-Image editing will be disabled.`);
+}
+
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const hf = process.env.HF_TOKEN ? new HfInference(process.env.HF_TOKEN) : null;
+const hf = process.env.HF_TOKEN ? new HfInference(process.env.HF_TOKEN.trim()) : null;
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -985,7 +991,7 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
           max_tokens: 150
         });
         
-        const finalPrompt = aiResponse.choices[0]?.message?.content?.trim() || `${imgDescription}, ${prompt}`;
+        const finalPrompt = aiResponse.choices[0]?.message?.content?.trim() || prompt;
         console.log(`[AI Editor] Generated Prompt: ${finalPrompt}`);
         
         // 3. Try Real Image-to-Image with HuggingFace
@@ -993,18 +999,19 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
           const modelsToTry = [
             "stabilityai/stable-diffusion-2-1",
             "stabilityai/sdxl-turbo",
-            "runwayml/stable-diffusion-v1-5" // last resort
+            "runwayml/stable-diffusion-v1-5"
           ];
 
           for (const modelId of modelsToTry) {
             try {
               console.log(`[AI Editor] 🚀 Attempting True Image-to-Image via HuggingFace (${modelId})...`);
+              // Ensure we pass the image as a Buffer directly
               const hfResponse = await hf.imageToImage({
                 model: modelId,
                 inputs: imageFiles[0].buffer,
                 parameters: {
                   prompt: finalPrompt,
-                  negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy",
+                  negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy, text, watermark",
                   strength: 0.6,
                   guidance_scale: 7.5
                 }
@@ -1019,9 +1026,14 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
               }
             } catch (hfErr) {
               console.warn(`[AI Editor] ⚠️ HuggingFace model ${modelId} failed: ${hfErr.message}`);
-              // Continue to next model
+              
+              if (hfErr.message.toLowerCase().includes("invalid username")) {
+                console.error("[AI Editor] CRITICAL: Your HF_TOKEN is likely invalid or lacks 'Inference' permissions.");
+                break; // No point trying other models if token is bad
+              }
+
               if (hfErr.message.includes("429") || hfErr.message.includes("limit")) {
-                console.error("[AI Editor] Rate limit reached for HuggingFace. Jumping to fallback.");
+                console.error("[AI Editor] Rate limit reached for HuggingFace.");
                 break;
               }
             }
