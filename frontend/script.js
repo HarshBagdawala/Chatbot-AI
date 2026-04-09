@@ -1131,7 +1131,9 @@ async function processImageRequest(msg, isNewSession) {
 
     if (!res.ok) throw new Error(data.error || "Image processing failed");
 
-    const bannerUrl = data.bannerUrl.startsWith('data:') ? data.bannerUrl : `${window.location.origin}${data.bannerUrl}`;
+    const bannerUrl = (data.bannerUrl.startsWith('data:') || data.bannerUrl.startsWith('http'))
+      ? data.bannerUrl
+      : `${window.location.origin}${data.bannerUrl}`;
     const bannerMessage = `✨ **Here is your generated image!** [IMAGE_GEN: ${bannerUrl}]`;
     appendMessage('assistant', bannerMessage);
 

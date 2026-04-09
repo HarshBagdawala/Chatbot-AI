@@ -138,8 +138,12 @@ async function describeImage(imageUrl, instruction = 'Describe this image in det
     });
     return response.data.choices[0].message.content.trim();
   } catch (error) {
+    if (error.response && error.response.status === 429) {
+       console.error('Mistral API rate limit (429) reached.');
+       return null; // Return null so we know it failed
+    }
     console.error('Image description error:', error.message);
-    return 'Unknown subject from image';
+    return null;
   }
 }
 
@@ -955,15 +959,26 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
         const imageUrl = `data:${mimeType};base64,${base64Img}`;
         
         // 1. Analyze original image
-        const imgDescription = await describeImage(imageUrl, "Briefly describe the primary subject, character, or object in this image. Do not mention the act of describing it. Just state what the subject is. Keep it under 2 sentences.");
-        console.log(`[AI Editor] Mistral Description: ${imgDescription}`);
+        let imgDescription = await describeImage(imageUrl, "Briefly describe the primary subject, character, or object in this image. Do not mention the act of describing it. Just state what the subject is. Keep it under 2 sentences.");
+        
+        let aiSystemPrompt = "You are an expert stable-diffusion prompt engineer. The user wants to edit an image. You are given the current image description and the user's prompt. Merging them, generate ONE highly detailed, comma-separated image generation prompt to create the final desired image. The new prompt must retain the main subject but apply the user's edits. Return ONLY the prompt text without any quotes or conversational fillers.";
+        let aiUserPrompt = `Original Image Subject: ${imgDescription}\nUser Edit Request: ${prompt}`;
+
+        if (!imgDescription) {
+           console.log(`[AI Editor] Mistral failed/rate-limited. Falling back to using only user's prompt.`);
+           aiSystemPrompt = "You are an expert stable-diffusion prompt engineer. Generate ONE highly detailed, comma-separated image generation prompt based purely on the user's text request. Return ONLY the prompt text without quotes.";
+           aiUserPrompt = `User Request: ${prompt}`;
+           imgDescription = prompt; // fallback for logs
+        } else {
+           console.log(`[AI Editor] Mistral Description: ${imgDescription}`);
+        }
         
         // 2. Generate new text prompt for the image
         const aiResponse = await groq.chat.completions.create({
           model: "llama-3.3-70b-versatile",
           messages: [
-            { role: "system", content: "You are an expert stable-diffusion prompt engineer. The user wants to edit an image. You are given the current image description and the user's prompt. Merging them, generate ONE highly detailed, comma-separated image generation prompt to create the final desired image. The new prompt must retain the main subject but apply the user's edits. Return ONLY the prompt text without any quotes or conversational fillers." },
-            { role: "user", content: `Original Image Subject: ${imgDescription}\nUser Edit Request: ${prompt}` }
+            { role: "system", content: aiSystemPrompt },
+            { role: "user", content: aiUserPrompt }
           ],
           max_tokens: 150
         });
