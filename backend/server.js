@@ -990,29 +990,41 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
         
         // 3. Try Real Image-to-Image with HuggingFace
         if (hf) {
-          try {
-            console.log("[AI Editor] 🚀 Attempting True Image-to-Image via HuggingFace...");
-            const hfResponse = await hf.imageToImage({
-              model: "runwayml/stable-diffusion-v1-5", 
-              inputs: imageFiles[0].buffer,
-              parameters: {
-                prompt: finalPrompt,
-                negative_prompt: "blurry, low quality, distorted, deformed, ugly",
-                strength: 0.65, // Retain structure but apply enough style
-                guidance_scale: 7.5
-              }
-            });
+          const modelsToTry = [
+            "stabilityai/stable-diffusion-2-1",
+            "stabilityai/sdxl-turbo",
+            "runwayml/stable-diffusion-v1-5" // last resort
+          ];
 
-            if (hfResponse && hfResponse.size > 0) {
-              const buffer = Buffer.from(await hfResponse.arrayBuffer());
-              const base64 = buffer.toString('base64');
-              const hfImageUrl = `data:image/jpeg;base64,${base64}`;
-              console.log("[AI Editor] ✅ Success via HuggingFace!");
-              return res.json({ success: true, bannerUrl: hfImageUrl, isEdit: true });
+          for (const modelId of modelsToTry) {
+            try {
+              console.log(`[AI Editor] 🚀 Attempting True Image-to-Image via HuggingFace (${modelId})...`);
+              const hfResponse = await hf.imageToImage({
+                model: modelId,
+                inputs: imageFiles[0].buffer,
+                parameters: {
+                  prompt: finalPrompt,
+                  negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy",
+                  strength: 0.6,
+                  guidance_scale: 7.5
+                }
+              });
+
+              if (hfResponse && hfResponse.size > 0) {
+                const buffer = Buffer.from(await hfResponse.arrayBuffer());
+                const base64 = buffer.toString('base64');
+                const hfImageUrl = `data:image/jpeg;base64,${base64}`;
+                console.log(`[AI Editor] ✅ Success via HuggingFace (${modelId})!`);
+                return res.json({ success: true, bannerUrl: hfImageUrl, isEdit: true });
+              }
+            } catch (hfErr) {
+              console.warn(`[AI Editor] ⚠️ HuggingFace model ${modelId} failed: ${hfErr.message}`);
+              // Continue to next model
+              if (hfErr.message.includes("429") || hfErr.message.includes("limit")) {
+                console.error("[AI Editor] Rate limit reached for HuggingFace. Jumping to fallback.");
+                break;
+              }
             }
-          } catch (hfErr) {
-            console.error("[AI Editor] ❌ HuggingFace Failed:", hfErr.message);
-            // Will fallback to Pollinations below
           }
         }
 
