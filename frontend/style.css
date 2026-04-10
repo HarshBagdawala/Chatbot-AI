@@ -1858,3 +1858,62 @@ er::before {
   object-fit: cover;
 }
 
+/* ─── Document Preview Styles ─────────────────────────────────────────── */
+.doc-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface2);
+  color: var(--text);
+  gap: 4px;
+}
+
+.doc-preview.pdf { border-color: rgba(239, 68, 68, 0.4); }
+.doc-preview.txt { border-color: rgba(59, 130, 246, 0.4); }
+
+.doc-icon { font-size: 24px; }
+.doc-label { font-size: 10px; font-weight: 700; opacity: 0.8; }
+
+.preview-item {
+  position: relative;
+  width: 100px;
+  height: 60px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.preview-item.pdf { border-left: 4px solid var(--danger); }
+.preview-item.txt { border-left: 4px solid var(--accent2); }
+
+.preview-icon { font-size: 20px; flex-shrink: 0; }
+.preview-name {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-muted);
+}
+
+.preview-item button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: rgba(0,0,0,0.5);
+  border: none;
+  color: #fff;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

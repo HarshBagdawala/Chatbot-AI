@@ -10,6 +10,7 @@ const Groq = require("groq-sdk");
 const { v4: uuidv4 } = require("uuid");
 const axios = require("axios");
 const { HfInference } = require("@huggingface/inference");
+const pdf = require("pdf-parse");
 
 const app = express();
 app.use(cors());
@@ -28,6 +29,81 @@ app.get('/favicon.ico', (req, res) => {
   res.send(svg);
 });
 
+// ─── Document Chat Route ────────────────────────────────────────────────────
+app.post("/api/chat/document", upload.array("files", 1), async (req, res) => {
+  const { message, session_id, username } = req.body;
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ error: "No document provided" });
+  }
+
+  const file = req.files[0];
+  const userPrefix = username ? `${username}_` : 'guest_';
+  const sessionId = session_id || `${userPrefix}${uuidv4()}`;
+
+  try {
+    let extractedText = "";
+
+    if (file.mimetype === "application/pdf") {
+      console.log(`[Document AI] Extracting text from PDF: ${file.originalname}`);
+      const pdfData = await pdf(file.buffer);
+      extractedText = pdfData.text;
+    } else if (file.mimetype === "text/plain") {
+      console.log(`[Document AI] Extracting text from TXT: ${file.originalname}`);
+      extractedText = file.buffer.toString("utf-8");
+    }
+
+    if (!extractedText || extractedText.trim().length === 0) {
+      return res.status(400).json({ error: "Could not extract text from document" });
+    }
+
+    // Truncate if too long (Simplified: take first 15k chars to stay safe with token limits)
+    const contextText = extractedText.length > 15000 ? extractedText.substring(0, 15000) + "..." : extractedText;
+
+    // 1. Build messages array
+    const messages = [
+      { 
+        role: "system", 
+        content: `You are a helpful AI assistant. You have been provided with a document titled "${file.originalname}". 
+        
+        DOCUMENT CONTENT START:
+        ${contextText}
+        DOCUMENT CONTENT END.
+        
+        The user will ask questions about this document. Use the provided content to answer accurately. If the information is not in the document, you can use your general knowledge but mention it's not in the document.` 
+      },
+      { role: "user", content: message || "Please summarize this document." }
+    ];
+
+    // 2. Call Groq
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages,
+      temperature: 0.5,
+      max_tokens: 1024,
+    });
+
+    const assistantReply = completion.choices[0]?.message?.content || "I've analyzed the document but couldn't generate a summary.";
+
+    // 3. Save to Supabase
+    if (username !== 'guest') {
+      await supabase.from("chat_messages").insert([
+        { session_id: sessionId, role: "user", content: message || `Uploaded document: ${file.originalname}` },
+        { session_id: sessionId, role: "assistant", content: assistantReply }
+      ]);
+    }
+
+    res.json({
+      reply: assistantReply,
+      session_id: sessionId,
+      fileName: file.originalname
+    });
+
+  } catch (err) {
+    console.error("[Document AI] Error:", err.message);
+    res.status(500).json({ error: "Document analysis failed: " + err.message });
+  }
+});
+
 // ─── Multer Setup ────────────────────────────────────────────────────────────
 const storage = multer.memoryStorage();
 
@@ -35,11 +111,14 @@ const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    const allowedTypes = [
+      "image/jpeg", "image/png", "image/webp",
+      "application/pdf", "text/plain"
+    ];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Only JPEG, PNG and WebP images are allowed"));
+      cb(new Error("Only images (JPEG, PNG, WebP) and documents (PDF, TXT) are allowed"));
     }
   },
 });

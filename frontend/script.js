@@ -315,7 +315,14 @@ function appendMessage(role, content, options = {}) {
   }
 
   if (images.length) {
-    imageHTML += `<div class="message-images">${images.map(src => `<div class="message-image-item"><img src="${src}"></div>`).join('')}</div>`;
+    imageHTML += `<div class="message-images">${images.map(src => {
+      if (src.includes('pdf-icon')) {
+        return `<div class="message-image-item doc-preview pdf"><span class="doc-icon">📄</span><span class="doc-label">PDF</span></div>`;
+      } else if (src.includes('txt-icon')) {
+        return `<div class="message-image-item doc-preview txt"><span class="doc-icon">📝</span><span class="doc-label">TXT</span></div>`;
+      }
+      return `<div class="message-image-item"><img src="${src}"></div>`;
+    }).join('')}</div>`;
   }
 
   div.innerHTML = `
@@ -470,7 +477,14 @@ function handleImageSelection(event) {
 function renderImagePreviews() {
   const container = document.getElementById('inputImagePreviews');
   if (!container) return;
-  container.innerHTML = selectedFiles.map((f, i) => `<div class="preview-item"><span>${f.name}</span><button onclick="removeSelectedImage(${i})">✕</button></div>`).join('');
+  container.innerHTML = selectedFiles.map((f, i) => {
+    let icon = '🖼️';
+    let typeClass = 'img';
+    if (f.type === 'application/pdf') { icon = '📄'; typeClass = 'pdf'; }
+    else if (f.type === 'text/plain') { icon = '📝'; typeClass = 'txt'; }
+    
+    return `<div class="preview-item ${typeClass}"><span class="preview-icon">${icon}</span><span class="preview-name">${f.name}</span><button onclick="removeSelectedImage(${i})">✕</button></div>`;
+  }).join('');
 }
 
 function removeSelectedImage(i) {
@@ -483,27 +497,48 @@ async function processImageRequest(msg, isNewSession) {
   selectedFiles = [];
   renderImagePreviews();
 
-  const previews = files.map(f => URL.createObjectURL(f));
-  appendMessage('user', msg || 'Processing images...', { images: previews });
+  const isDocument = files.some(f => f.type === 'application/pdf' || f.type === 'text/plain');
+  const previews = files.map(f => {
+    if (f.type === 'application/pdf') return 'pdf-icon';
+    if (f.type === 'text/plain') return 'txt-icon';
+    return URL.createObjectURL(f);
+  });
+  
+  appendMessage('user', msg || (isDocument ? 'Analyzing document...' : 'Processing images...'), { images: previews });
   showTyping();
 
   const formData = new FormData();
-  files.forEach(f => formData.append('images', f));
+  // Using different field names for better backend routing if needed
+  if (isDocument) {
+    formData.append('files', files[0]); // Only handle first doc for now
+  } else {
+    files.forEach(f => formData.append('images', f));
+  }
+  
   formData.append('prompt', msg || '');
+  formData.append('message', msg || ''); // Support both names
   if (sessionId) formData.append('session_id', sessionId);
   if (currentUsername) formData.append('username', currentUsername);
 
+  const endpoint = isDocument ? '/api/chat/document' : '/api/banner/create';
+
   try {
-    const res = await fetch('/api/banner/create', { method: 'POST', body: formData });
+    const res = await fetch(endpoint, { method: 'POST', body: formData });
     const data = await res.json();
     hideTyping();
     if (!res.ok) throw new Error(data.error);
 
-    const bannerUrl = (data.bannerUrl.startsWith('data:') || data.bannerUrl.startsWith('http')) ? data.bannerUrl : `${window.location.origin}${data.bannerUrl}`;
-    appendMessage('assistant', `✨ **Done!** [IMAGE_GEN: ${bannerUrl}]`);
-    if (data.session_id) {
+    if (isDocument) {
       sessionId = data.session_id;
       localStorage.setItem('chat_session_id', sessionId);
+      appendMessage('assistant', `📄 **Document Analyzed: ${data.fileName}**\n\n${data.reply}`);
+    } else {
+      const bannerUrl = (data.bannerUrl.startsWith('data:') || data.bannerUrl.startsWith('http')) ? data.bannerUrl : `${window.location.origin}${data.bannerUrl}`;
+      appendMessage('assistant', `✨ **Done!** [IMAGE_GEN: ${bannerUrl}]`);
+      if (data.session_id) {
+        sessionId = data.session_id;
+        localStorage.setItem('chat_session_id', sessionId);
+      }
     }
     if (isNewSession) loadSessions();
   } catch (err) {
