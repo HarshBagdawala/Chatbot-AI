@@ -305,8 +305,8 @@ function appendMessage(role, content, options = {}) {
       <div class="generated-image-card">
         <div class="image-loading-skeleton" id="skeleton_${randomId}"></div>
         <img src="${imageUrl}" class="generated-image" 
-             onload="document.getElementById('skeleton_${randomId}').style.display='none'; this.style.opacity='1'"
-             onerror="this.src='https://via.placeholder.com/512?text=Error'; document.getElementById('skeleton_${randomId}').style.display='none'">
+             onload="if(this.previousElementSibling) this.previousElementSibling.style.display='none'; this.style.opacity='1'"
+             onerror="this.src='https://via.placeholder.com/512?text=Error'; if(this.previousElementSibling) this.previousElementSibling.style.display='none'; this.style.opacity='1'">
         <div class="image-actions">
           <button onclick="downloadImage('${imageUrl}')" class="download-btn">Save Image</button>
         </div>
@@ -535,6 +535,23 @@ async function downloadImage(url) {
 const savedTheme = localStorage.getItem('chat_theme') || 'emerald';
 document.documentElement.setAttribute('data-theme', savedTheme);
 
+// Theme Toggle
+const themeBtn = document.getElementById('themeBtn');
+const themeMenu = document.getElementById('themeMenu');
+
+if (themeBtn && themeMenu) {
+  themeBtn.onclick = (e) => {
+    e.stopPropagation();
+    themeMenu.classList.toggle('show');
+  };
+
+  document.addEventListener('click', (e) => {
+    if (!themeMenu.contains(e.target) && !themeBtn.contains(e.target)) {
+      themeMenu.classList.remove('show');
+    }
+  });
+}
+
 // Start
 checkAuth();
 const themeOptions = document.querySelectorAll('.theme-option');
@@ -543,5 +560,10 @@ themeOptions.forEach(opt => {
     const theme = opt.dataset.theme;
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('chat_theme', theme);
+    themeMenu.classList.remove('show');
+    
+    // Update active state in menu
+    themeOptions.forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
   };
 });
