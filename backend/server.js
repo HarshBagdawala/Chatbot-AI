@@ -1,4 +1,4 @@
-const path = require("path");
+﻿const path = require("path");
 const fs = require("fs");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 const express = require("express");
@@ -152,10 +152,12 @@ async function describeImage(imageUrl, instruction = 'Describe this image in det
 
   // 2. Fallback to Groq Vision
   try {
-    console.log('[AI Vision] Attempting description via Groq Llama-3.2 Vision...');
+    console.log('[AI Vision] Attempting description via Groq Llama 4 Scout Vision...');
     const completion = await groq.chat.completions.create({
-      model: "llama-3.2-11b-vision-preview",
+      model: "meta-llama/llama-4-scout-17b-16e-instruct", // Upgraded to Llama 4 Scout as Llama 3.2 Vision is decommissioned
       messages: [
+
+
         {
           role: 'user',
           content: [
@@ -987,19 +989,19 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
         const base64Img = imageFiles[0].buffer.toString('base64');
         const imageUrl = `data:${mimeType};base64,${base64Img}`;
         
-        // 1. Analyze original image
+        // 1. Analyze original image via Vision (Mistral -> Groq fallback)
         let imgDescription = await describeImage(imageUrl, "Briefly describe the primary subject, character, or object in this image. Do not mention the act of describing it. Just state what the subject is. Keep it under 2 sentences.");
         
         let aiSystemPrompt = "You are an expert stable-diffusion prompt engineer. The user wants to edit an image. You are given the current image description and the user's prompt. Merging them, generate ONE highly detailed, comma-separated image generation prompt to create the final desired image. The new prompt must retain the main subject but apply the user's edits. Return ONLY the prompt text without any quotes or conversational fillers.";
         let aiUserPrompt = `Original Image Subject: ${imgDescription}\nUser Edit Request: ${prompt}`;
 
         if (!imgDescription) {
-           console.log(`[AI Editor] Mistral failed/rate-limited. Falling back to using only user's prompt.`);
+           console.log(`[AI Editor] Vision APIs failed. Falling back to using only user's prompt.`);
            aiSystemPrompt = "You are an expert stable-diffusion prompt engineer. Generate ONE highly detailed, comma-separated image generation prompt based purely on the user's text request. Return ONLY the prompt text without quotes.";
            aiUserPrompt = `User Request: ${prompt}`;
-           imgDescription = prompt; // fallback for logs
+           imgDescription = prompt;
         } else {
-           console.log(`[AI Editor] Mistral Description: ${imgDescription}`);
+           console.log(`[AI Editor] Vision Description: ${imgDescription}`);
         }
         
         // 2. Generate new text prompt for the image
@@ -1018,24 +1020,21 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
         // 3. Try Real Image-to-Image with HuggingFace
         if (hf) {
           const modelsToTry = [
-            "stabilityai/sdxl-turbo",
-            "stabilityai/stable-diffusion-xl-base-1.0",
-            "stabilityai/stable-diffusion-2-1",
-            "runwayml/stable-diffusion-v1-5"
+            "runwayml/stable-diffusion-v1-5",
+            "timbrooks/instruct-pix2pix",
+            "stabilityai/stable-diffusion-2-1"
           ];
 
           for (const modelId of modelsToTry) {
             try {
-              console.log(`[AI Editor] 🚀 Attempting True Image-to-Image via HuggingFace (${modelId})...`);
-              
-              // Helper to convert data URL or Buffer to Blob/File for HF
+              console.log(`[AI Editor] Attempting Image-to-Image via HuggingFace (${modelId})...`);
               const hfResponse = await hf.imageToImage({
                 model: modelId,
                 inputs: imageFiles[0].buffer,
                 parameters: {
                   prompt: finalPrompt,
                   negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy, text, watermark, sloppy, messy",
-                  strength: 0.55, // Lowered slightly to preserve more of original structure
+                  strength: 0.55,
                   guidance_scale: 8.0,
                   num_inference_steps: 30
                 }
@@ -1045,18 +1044,17 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
                 const buffer = Buffer.from(await hfResponse.arrayBuffer());
                 const base64 = buffer.toString('base64');
                 const hfImageUrl = `data:image/jpeg;base64,${base64}`;
-                console.log(`[AI Editor] ✅ Success via HuggingFace (${modelId})!`);
+                console.log(`[AI Editor] HuggingFace Success (${modelId})!`);
                 return res.json({ success: true, bannerUrl: hfImageUrl, isEdit: true });
               }
             } catch (hfErr) {
               const errMsg = hfErr.message.toLowerCase();
-              console.warn(`[AI Editor] ⚠️ HF model ${modelId} failed: ${hfErr.message}`);
+              console.warn(`[AI Editor] HF model ${modelId} failed: ${hfErr.message}`);
               
               if (errMsg.includes("invalid username") || errMsg.includes("invalid token") || errMsg.includes("401")) {
-                console.error("[AI Editor] ❌ CRITICAL: Your HF_TOKEN is likely invalid or lacks 'Inference' permissions.");
-                break; // No point trying other models if token is bad
+                console.error("[AI Editor] CRITICAL: HF_TOKEN is invalid or lacks Inference permissions.");
+                break;
               }
-
               if (errMsg.includes("429") || errMsg.includes("limit") || errMsg.includes("busy")) {
                 console.log(`[AI Editor] Model ${modelId} is busy/limited, trying next...`);
                 continue;
@@ -1065,13 +1063,27 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
           }
         }
 
-
-        // 3. Fallback: Call Pollinations AI (Text-to-Image only)
-        console.log("[AI Editor] ⚠️ Falling back to Pollinations (Text-to-Image)...");
+        // 4. Smart Fallback: Pollinations AI with vision-enhanced prompt
+        console.log("[AI Editor] Using Pollinations AI with vision-enhanced prompt...");
         const randomSeed = Math.floor(Math.random() * 1000000);
         const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=${targetWidth}&height=${targetHeight}&nologo=true&seed=${randomSeed}`;
         
-        console.log(`[AI Editor] ✅ Fallback Success URL: ${pollinationsUrl}`);
+        // Pre-fetch to validate and embed the image
+        try {
+          const pollinationsResponse = await axios.get(pollinationsUrl, { responseType: 'arraybuffer', timeout: 30000 });
+          if (pollinationsResponse.data && pollinationsResponse.data.length > 1000) {
+            const base64 = Buffer.from(pollinationsResponse.data).toString('base64');
+            const contentType = pollinationsResponse.headers['content-type'] || 'image/jpeg';
+            const resultUrl = `data:${contentType};base64,${base64}`;
+            console.log(`[AI Editor] Pollinations Success! Image size: ${(pollinationsResponse.data.length / 1024).toFixed(0)}KB`);
+            return res.json({ success: true, bannerUrl: resultUrl, isEdit: true });
+          }
+        } catch (pollErr) {
+          console.warn(`[AI Editor] Pollinations download failed: ${pollErr.message}`);
+        }
+        
+        // 5. Ultimate fallback: Return Pollinations URL directly
+        console.log(`[AI Editor] Returning Pollinations URL directly.`);
         return res.json({ success: true, bannerUrl: pollinationsUrl, isEdit: true });
         
       } catch (aiEditError) {
