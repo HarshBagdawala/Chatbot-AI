@@ -121,6 +121,7 @@ async function performWebSearch(query) {
 
 // ─── Product Search Functions ────────────────────────────────────────────────
 async function describeImage(imageUrl, instruction = 'Describe this image in detail, focusing on any products, items, or objects visible. Provide a concise description suitable for product search.') {
+  // 1. Try Mistral first
   try {
     const response = await axios.post('https://api.mistral.ai/v1/chat/completions', {
       model: 'pixtral-12b-2409',
@@ -143,13 +144,37 @@ async function describeImage(imageUrl, instruction = 'Describe this image in det
     return response.data.choices[0].message.content.trim();
   } catch (error) {
     if (error.response && error.response.status === 429) {
-       console.error('Mistral API rate limit (429) reached.');
-       return null; // Return null so we know it failed
+       console.warn('[AI Vision] Mistral API rate limit (429) reached. Falling back to Groq Vision...');
+    } else {
+       console.error('[AI Vision] Mistral error:', error.message);
     }
-    console.error('Image description error:', error.message);
+  }
+
+  // 2. Fallback to Groq Vision
+  try {
+    console.log('[AI Vision] Attempting description via Groq Llama-3.2 Vision...');
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.2-11b-vision-preview",
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: instruction },
+            { type: 'image_url', image_url: { url: imageUrl } }
+          ]
+        }
+      ],
+      max_tokens: 200
+    });
+    const result = completion.choices[0].message.content.trim();
+    console.log('[AI Vision] ✅ Success via Groq Vision!');
+    return result;
+  } catch (groqErr) {
+    console.error('[AI Vision] Groq Vision failed too:', groqErr.message);
     return null;
   }
 }
+
 
 
 
@@ -993,23 +1018,26 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
         // 3. Try Real Image-to-Image with HuggingFace
         if (hf) {
           const modelsToTry = [
-            "stabilityai/stable-diffusion-2-1",
             "stabilityai/sdxl-turbo",
+            "stabilityai/stable-diffusion-xl-base-1.0",
+            "stabilityai/stable-diffusion-2-1",
             "runwayml/stable-diffusion-v1-5"
           ];
 
           for (const modelId of modelsToTry) {
             try {
               console.log(`[AI Editor] 🚀 Attempting True Image-to-Image via HuggingFace (${modelId})...`);
-              // Ensure we pass the image as a Buffer directly
+              
+              // Helper to convert data URL or Buffer to Blob/File for HF
               const hfResponse = await hf.imageToImage({
                 model: modelId,
                 inputs: imageFiles[0].buffer,
                 parameters: {
                   prompt: finalPrompt,
-                  negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy, text, watermark",
-                  strength: 0.6,
-                  guidance_scale: 7.5
+                  negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy, text, watermark, sloppy, messy",
+                  strength: 0.55, // Lowered slightly to preserve more of original structure
+                  guidance_scale: 8.0,
+                  num_inference_steps: 30
                 }
               });
 
@@ -1021,20 +1049,22 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
                 return res.json({ success: true, bannerUrl: hfImageUrl, isEdit: true });
               }
             } catch (hfErr) {
-              console.warn(`[AI Editor] ⚠️ HuggingFace model ${modelId} failed: ${hfErr.message}`);
+              const errMsg = hfErr.message.toLowerCase();
+              console.warn(`[AI Editor] ⚠️ HF model ${modelId} failed: ${hfErr.message}`);
               
-              if (hfErr.message.toLowerCase().includes("invalid username")) {
-                console.error("[AI Editor] CRITICAL: Your HF_TOKEN is likely invalid or lacks 'Inference' permissions.");
+              if (errMsg.includes("invalid username") || errMsg.includes("invalid token") || errMsg.includes("401")) {
+                console.error("[AI Editor] ❌ CRITICAL: Your HF_TOKEN is likely invalid or lacks 'Inference' permissions.");
                 break; // No point trying other models if token is bad
               }
 
-              if (hfErr.message.includes("429") || hfErr.message.includes("limit")) {
-                console.error("[AI Editor] Rate limit reached for HuggingFace.");
-                break;
+              if (errMsg.includes("429") || errMsg.includes("limit") || errMsg.includes("busy")) {
+                console.log(`[AI Editor] Model ${modelId} is busy/limited, trying next...`);
+                continue;
               }
             }
           }
         }
+
 
         // 3. Fallback: Call Pollinations AI (Text-to-Image only)
         console.log("[AI Editor] ⚠️ Falling back to Pollinations (Text-to-Image)...");
@@ -1261,6 +1291,18 @@ if (require.main === module) {
     
     if (process.env.HF_TOKEN) {
       console.log(`\x1b[34m🖼️  HuggingFace: ✅ [Token Detected: ${maskToken(process.env.HF_TOKEN)}]\x1b[0m`);
+      
+      // Optional: Perform a real auth check
+      fetch('https://huggingface.co/api/whoami', {
+        headers: { 'Authorization': `Bearer ${process.env.HF_TOKEN.trim()}` }
+      }).then(r => r.json()).then(data => {
+        if (data.name) {
+          console.log(`\x1b[32m✅ HuggingFace Auth: Success! logged in as ${data.name}\x1b[0m`);
+        } else {
+          console.log(`\x1b[31m❌ HuggingFace Auth: Failed - ${data.error || 'Invalid Token'}\x1b[0m`);
+        }
+      }).catch(e => console.log(`\x1b[33m⚠️ HuggingFace Auth check skipped: ${e.message}\x1b[0m`));
+
     } else {
       console.log(`\x1b[31m🖼️  HuggingFace: ❌ [Token NOT Set in .env]\x1b[0m`);
     }
@@ -1268,3 +1310,4 @@ if (require.main === module) {
     console.log(`\n\x1b[90mSecurity Info: No API keys are exposed to the frontend/browser inspect tools.\x1b[0m\n`);
   });
 }
+
