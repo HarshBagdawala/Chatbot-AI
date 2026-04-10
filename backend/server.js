@@ -1054,24 +1054,38 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
           }
         }
 
-        // 4. Reliable Fallback: Pollinations AI
-        console.log("[AI Editor] 🎨 Falling back to Pollinations AI...");
+        // 4. Guaranteed Fallback: Pollinations AI (Downloaded on Server)
+        console.log("[AI Editor] 🎨 Generating via Pollinations AI (Server-side download)...");
         const seed = Math.floor(Math.random() * 1000000);
-        const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=${targetWidth}&height=${targetHeight}&nologo=true&seed=${seed}&model=flux`;
+        const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=${targetWidth}&height=${targetHeight}&nologo=true&seed=${seed}`;
         
-        console.log(`[AI Editor] ✅ Returning Pollinations URL.`);
-        return res.json({ 
-          success: true, 
-          bannerUrl: pollinationsUrl, 
-          isEdit: true,
-          modelUsed: "pollinations"
-        });
+        try {
+          // Download the image on server to ensure it exists and bypass browser blocking
+          const pollRes = await axios.get(pollinationsUrl, { responseType: 'arraybuffer', timeout: 15000 });
+          if (pollRes.data && pollRes.data.length > 500) {
+            const b64 = Buffer.from(pollRes.data).toString('base64');
+            const dataUri = `data:image/jpeg;base64,${b64}`;
+            console.log(`[AI Editor] ✅ Pollinations Success (Downloaded ${Math.round(pollRes.data.length/1024)}KB)`);
+            return res.json({ 
+              success: true, 
+              bannerUrl: dataUri, 
+              isEdit: true,
+              modelUsed: "pollinations_embedded"
+            });
+          }
+        } catch (downloadErr) {
+          console.warn(`[AI Editor] Server-side download failed: ${downloadErr.message}. Falling back to direct URL.`);
+        }
+
+        // Ultimate fallback: Just return the URL if download fails
+        return res.json({ success: true, bannerUrl: pollinationsUrl, isEdit: true });
         
       } catch (err) {
         console.error("AI Editor Branch Error:", err);
         return res.status(500).json({ error: "AI Editing failed: " + err.message });
       }
     }
+
 
 
     // ── 1. Generate AI Caption (Collage Mode) ────────────────────────────────
