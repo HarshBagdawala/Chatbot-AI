@@ -1,4 +1,4 @@
-﻿const path = require("path");
+const path = require("path");
 const fs = require("fs");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 const express = require("express");
@@ -1054,37 +1054,46 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
           }
         }
 
-        // 4. Guaranteed Fallback: Pollinations AI (Downloaded on Server)
-        console.log("[AI Editor] 🎨 Generating via Pollinations AI (Server-side download)...");
+        // 4. Guaranteed Fallback: Pollinations AI (Optimized & Resilient)
+        console.log("[AI Editor] 🎨 Generating via Pollinations AI (Optimized)...");
         const seed = Math.floor(Math.random() * 1000000);
-        const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=${targetWidth}&height=${targetHeight}&nologo=true&seed=${seed}`;
-
+        
+        // Create a shorter prompt for the URL to avoid 500/Too Long errors
+        const shortPrompt = finalPrompt.length > 300 ? finalPrompt.substring(0, 300) + "..." : finalPrompt;
+        const pollinationsUrl = `https://pollinations.ai/p/${encodeURIComponent(shortPrompt)}?width=1024&height=768&seed=${seed}&nologo=true`;
+        
         try {
-          // Download the image on server to ensure it exists and bypass browser blocking
-          const pollRes = await axios.get(pollinationsUrl, { responseType: 'arraybuffer', timeout: 15000 });
-          if (pollRes.data && pollRes.data.length > 500) {
+          // Attempt server-side download with a slightly shorter timeout
+          const pollRes = await axios.get(pollinationsUrl, { responseType: 'arraybuffer', timeout: 8000 });
+          if (pollRes.data && pollRes.data.length > 1000) {
             const b64 = Buffer.from(pollRes.data).toString('base64');
             const dataUri = `data:image/jpeg;base64,${b64}`;
-            console.log(`[AI Editor] ✅ Pollinations Success (Downloaded ${Math.round(pollRes.data.length / 1024)}KB)`);
-            return res.json({
-              success: true,
-              bannerUrl: dataUri,
+            console.log(`[AI Editor] ✅ Pollinations Success (Embedded)`);
+            return res.json({ 
+              success: true, 
+              bannerUrl: dataUri, 
               isEdit: true,
               modelUsed: "pollinations_embedded"
             });
           }
         } catch (downloadErr) {
-          console.warn(`[AI Editor] Server-side download failed: ${downloadErr.message}. Falling back to direct URL.`);
+          console.warn(`[AI Editor] Server download failed: ${downloadErr.message}. Returning Direct URL.`);
         }
 
-        // Ultimate fallback: Just return the URL if download fails
-        return res.json({ success: true, bannerUrl: pollinationsUrl, isEdit: true });
-
+        // Return the direct URL if download fails (Browser will try to load it)
+        return res.json({ 
+          success: true, 
+          bannerUrl: pollinationsUrl, 
+          isEdit: true,
+          debugUrl: pollinationsUrl // For frontend to show if image fails
+        });
+        
       } catch (err) {
         console.error("AI Editor Branch Error:", err);
         return res.status(500).json({ error: "AI Editing failed: " + err.message });
       }
     }
+
 
 
 
