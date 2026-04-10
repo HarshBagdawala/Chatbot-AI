@@ -1,4 +1,4 @@
-const path = require("path");
+﻿const path = require("path");
 const fs = require("fs");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 const express = require("express");
@@ -72,37 +72,37 @@ async function performWebSearch(query) {
     });
 
     if (!response.ok) {
-       console.error(`Search Engine responded with ${response.status}`);
-       if (response.status === 403) return "Search engine blocked the request. Please try again later or ask something else.";
-       throw new Error(`HTTP error! status: ${response.status}`);
+      console.error(`Search Engine responded with ${response.status}`);
+      if (response.status === 403) return "Search engine blocked the request. Please try again later or ask something else.";
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const html = await response.text();
     let results = [];
 
     // Improved parsing for DDG HTML results
     const chunks = html.split('class="result__snippet');
-    
+
     for (let i = 1; i < Math.min(chunks.length, 5); i++) {
-        const chunk = chunks[i];
-        const prevChunk = chunks[i-1];
-        
-        // Extract title
-        const titleMatch = prevChunk.match(/class="result__title"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i);
-        
-        // Extract snippet (it's at the start of the current chunk)
-        const snippetMatch = chunk.match(/^[^>]*>([\s\S]*?)<\/a>/i);
+      const chunk = chunks[i];
+      const prevChunk = chunks[i - 1];
 
-        if (titleMatch && snippetMatch) {
-            const cleanTitle = titleMatch[1].replace(/<\/?[^>]+(>|$)/g, "").trim();
-            const cleanSnippet = snippetMatch[1].replace(/<\/?[^>]+(>|$)/g, "").trim();
-            
-            // To HTML decode basic entities
-            const finalTitle = cleanTitle.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-            const finalSnippet = cleanSnippet.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+      // Extract title
+      const titleMatch = prevChunk.match(/class="result__title"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i);
 
-            results.push(`Title: ${finalTitle}\nSnippet: ${finalSnippet}`);
-        }
+      // Extract snippet (it's at the start of the current chunk)
+      const snippetMatch = chunk.match(/^[^>]*>([\s\S]*?)<\/a>/i);
+
+      if (titleMatch && snippetMatch) {
+        const cleanTitle = titleMatch[1].replace(/<\/?[^>]+(>|$)/g, "").trim();
+        const cleanSnippet = snippetMatch[1].replace(/<\/?[^>]+(>|$)/g, "").trim();
+
+        // To HTML decode basic entities
+        const finalTitle = cleanTitle.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+        const finalSnippet = cleanSnippet.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+
+        results.push(`Title: ${finalTitle}\nSnippet: ${finalSnippet}`);
+      }
     }
 
     if (results.length === 0) {
@@ -111,7 +111,7 @@ async function performWebSearch(query) {
       if (linkMatches) return "Found search results but could not extract details. Try a more specific question.";
       return "No web results found.";
     }
-    
+
     return results.join('\n\n');
   } catch (err) {
     console.error("Web search failed:", err.message);
@@ -144,9 +144,9 @@ async function describeImage(imageUrl, instruction = 'Describe this image in det
     return response.data.choices[0].message.content.trim();
   } catch (error) {
     if (error.response && error.response.status === 429) {
-       console.warn('[AI Vision] Mistral API rate limit (429) reached. Falling back to Groq Vision...');
+      console.warn('[AI Vision] Mistral API rate limit (429) reached. Falling back to Groq Vision...');
     } else {
-       console.error('[AI Vision] Mistral error:', error.message);
+      console.error('[AI Vision] Mistral error:', error.message);
     }
   }
 
@@ -572,7 +572,7 @@ function isHTMLPageRequest(message) {
     'create page', 'make page', 'web page', 'html template',
     'design page', 'build page', 'webpage code'
   ];
-  
+
   const lowerMessage = message.toLowerCase();
   return htmlKeywords.some(keyword => lowerMessage.includes(keyword));
 }
@@ -792,12 +792,12 @@ app.post("/api/chat", async (req, res) => {
     while (assistantMessage.tool_calls && toolTurns < 5) {
       toolTurns++;
       console.log(`Tool Turn ${toolTurns}: Handling ${assistantMessage.tool_calls.length} calls`);
-      
+
       messages.push(assistantMessage);
 
       for (const toolCall of assistantMessage.tool_calls) {
         let toolResults = "";
-        
+
         if (toolCall.function.name === 'search_web') {
           const args = JSON.parse(toolCall.function.arguments);
           console.log(`Searching web for: ${args.query}`);
@@ -812,7 +812,7 @@ app.post("/api/chat", async (req, res) => {
           toolResults = `Successfully generated the image. Tell the user you've created it and MUST include this exact tag in your response: [IMAGE_GEN: ${imageUrl}]`;
           console.log(`Generated Image URL: ${imageUrl}`);
         }
-        
+
         messages.push({
           role: "tool",
           tool_call_id: toolCall.id,
@@ -975,9 +975,9 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
     const imageFiles = req.files;
     let targetWidth, targetHeight;
 
-    if (size === 'square')        { targetWidth = 1080; targetHeight = 1080; }
+    if (size === 'square') { targetWidth = 1080; targetHeight = 1080; }
     else if (size === 'portrait') { targetWidth = 1080; targetHeight = 1920; }
-    else                          { targetWidth = 1920; targetHeight = 1080; } // landscape
+    else { targetWidth = 1920; targetHeight = 1080; } // landscape
 
     const count = imageFiles.length;
 
@@ -988,22 +988,22 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
         const mimeType = imageFiles[0].mimetype;
         const base64Img = imageFiles[0].buffer.toString('base64');
         const imageUrl = `data:${mimeType};base64,${base64Img}`;
-        
+
         // 1. Analyze original image via Vision
         let imgDescription = await describeImage(imageUrl, "Briefly describe the primary subject, character, or object in this image. Do not mention the act of describing it. Just state what the subject is. Keep it under 2 sentences.");
-        
+
         let aiSystemPrompt = "You are an expert stable-diffusion prompt engineer. The user wants to edit an image. You are given the current image description and the user's prompt. Merging them, generate ONE highly detailed, comma-separated image generation prompt to create the final desired image. Return ONLY the prompt text.";
         let aiUserPrompt = `Original Image Subject: ${imgDescription}\nUser Edit Request: ${prompt}`;
 
         if (!imgDescription) {
-           console.log(`[AI Editor] Vision APIs failed. Using user prompt only.`);
-           aiSystemPrompt = "You are an expert stable-diffusion prompt engineer. Generate ONE highly detailed, comma-separated image generation prompt based purely on the user's text request.";
-           aiUserPrompt = `User Request: ${prompt}`;
-           imgDescription = prompt;
+          console.log(`[AI Editor] Vision APIs failed. Using user prompt only.`);
+          aiSystemPrompt = "You are an expert stable-diffusion prompt engineer. Generate ONE highly detailed, comma-separated image generation prompt based purely on the user's text request.";
+          aiUserPrompt = `User Request: ${prompt}`;
+          imgDescription = prompt;
         } else {
-           console.log(`[AI Editor] Vision Description: ${imgDescription}`);
+          console.log(`[AI Editor] Vision Description: ${imgDescription}`);
         }
-        
+
         // 2. Generate optimized text prompt
         const aiResponse = await groq.chat.completions.create({
           model: "llama-3.3-70b-versatile",
@@ -1013,10 +1013,10 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
           ],
           max_tokens: 150
         });
-        
+
         const finalPrompt = aiResponse.choices[0]?.message?.content?.trim() || prompt;
         console.log(`[AI Editor] Final Prompt: ${finalPrompt}`);
-        
+
         // 3. Try Image-to-Image with HuggingFace (if token works)
         if (process.env.HF_TOKEN && process.env.HF_TOKEN.startsWith('hf_')) {
           const modelsToTry = [
@@ -1058,17 +1058,17 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
         console.log("[AI Editor] 🎨 Generating via Pollinations AI (Server-side download)...");
         const seed = Math.floor(Math.random() * 1000000);
         const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=${targetWidth}&height=${targetHeight}&nologo=true&seed=${seed}`;
-        
+
         try {
           // Download the image on server to ensure it exists and bypass browser blocking
           const pollRes = await axios.get(pollinationsUrl, { responseType: 'arraybuffer', timeout: 15000 });
           if (pollRes.data && pollRes.data.length > 500) {
             const b64 = Buffer.from(pollRes.data).toString('base64');
             const dataUri = `data:image/jpeg;base64,${b64}`;
-            console.log(`[AI Editor] ✅ Pollinations Success (Downloaded ${Math.round(pollRes.data.length/1024)}KB)`);
-            return res.json({ 
-              success: true, 
-              bannerUrl: dataUri, 
+            console.log(`[AI Editor] ✅ Pollinations Success (Downloaded ${Math.round(pollRes.data.length / 1024)}KB)`);
+            return res.json({
+              success: true,
+              bannerUrl: dataUri,
               isEdit: true,
               modelUsed: "pollinations_embedded"
             });
@@ -1079,7 +1079,7 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
 
         // Ultimate fallback: Just return the URL if download fails
         return res.json({ success: true, bannerUrl: pollinationsUrl, isEdit: true });
-        
+
       } catch (err) {
         console.error("AI Editor Branch Error:", err);
         return res.status(500).json({ error: "AI Editing failed: " + err.message });
@@ -1148,9 +1148,9 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
       const sideW = targetWidth - heroW;
       const halfH = Math.floor(targetHeight / 2);
 
-      const hero  = await sharp(imageFiles[0].buffer).resize(heroW, targetHeight, { fit: 'cover', position: 'centre' }).toBuffer();
-      const top2  = await sharp(imageFiles[1].buffer).resize(sideW, halfH,       { fit: 'cover', position: 'centre' }).toBuffer();
-      const bot2  = await sharp(imageFiles[2].buffer).resize(sideW, targetHeight - halfH, { fit: 'cover', position: 'centre' }).toBuffer();
+      const hero = await sharp(imageFiles[0].buffer).resize(heroW, targetHeight, { fit: 'cover', position: 'centre' }).toBuffer();
+      const top2 = await sharp(imageFiles[1].buffer).resize(sideW, halfH, { fit: 'cover', position: 'centre' }).toBuffer();
+      const bot2 = await sharp(imageFiles[2].buffer).resize(sideW, targetHeight - halfH, { fit: 'cover', position: 'centre' }).toBuffer();
 
       compositeList.push({ input: hero, top: 0, left: 0 });
       compositeList.push({ input: top2, top: 0, left: heroW });
@@ -1205,11 +1205,11 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
 
     // ── 4. Premium Caption Overlay ───────────────────────────────────────────────
     if (smartCaption) {
-      const escaped = smartCaption.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-      const fontSize    = Math.max(48, Math.floor(targetHeight * 0.075));
+      const escaped = smartCaption.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const fontSize = Math.max(48, Math.floor(targetHeight * 0.075));
       const subFontSize = Math.max(22, Math.floor(fontSize * 0.38));
-      const captionY    = Math.floor(targetHeight * 0.84);
-      const subY        = captionY + fontSize * 0.85;
+      const captionY = Math.floor(targetHeight * 0.84);
+      const subY = captionY + fontSize * 0.85;
 
       const captionSvg = `<svg width="${targetWidth}" height="${targetHeight}" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -1258,9 +1258,9 @@ app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {
     const finalBuffer = await sharp({
       create: { width: targetWidth, height: targetHeight, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 1 } }
     })
-    .composite(compositeList)
-    .webp({ quality: 90, effort: 4 })
-    .toBuffer();
+      .composite(compositeList)
+      .webp({ quality: 90, effort: 4 })
+      .toBuffer();
 
     const bannerUrl = `data:image/webp;base64,${finalBuffer.toString("base64")}`;
     console.log(`[Banner Creator] ✅ Success — ${(finalBuffer.length / 1024).toFixed(0)}KB, ${targetWidth}x${targetHeight}`);
@@ -1296,10 +1296,10 @@ if (require.main === module) {
     console.log(`\x1b[32m📦 Supabase connected: ✅ [URL: ${process.env.SUPABASE_URL}] \x1b[0m`);
     console.log(`\x1b[33m🔑 Supabase Key: ${maskToken(process.env.SUPABASE_ANON_KEY)}\x1b[0m`);
     console.log(`\x1b[35m🧠 Groq API: ✅ [Key: ${maskToken(process.env.GROQ_API_KEY)}]\x1b[0m`);
-    
+
     if (process.env.HF_TOKEN) {
       console.log(`\x1b[34m🖼️  HuggingFace: ✅ [Token Detected: ${maskToken(process.env.HF_TOKEN)}]\x1b[0m`);
-      
+
       // Optional: Perform a real auth check
       fetch('https://huggingface.co/api/whoami', {
         headers: { 'Authorization': `Bearer ${process.env.HF_TOKEN.trim()}` }
