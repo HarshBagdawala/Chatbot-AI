@@ -412,8 +412,13 @@ async function sendMessage(isVoice = false) {
   }
 
   appendMessage('user', msg);
-  showTyping();
+  await getAIResponse(msg, isVoice, isNewSession);
+  sendBtn.disabled = false;
+  userInput.focus();
+}
 
+async function getAIResponse(msg, isVoice = false, isNewSession = false) {
+  showTyping();
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
@@ -434,8 +439,6 @@ async function sendMessage(isVoice = false) {
     hideTyping();
     showToast('❌ ' + err.message);
   }
-  sendBtn.disabled = false;
-  userInput.focus();
 }
 
 function sendSuggestion(text) {
@@ -602,3 +605,53 @@ themeOptions.forEach(opt => {
     opt.classList.add('active');
   };
 });
+// ─── Edit Functionality ──────────────────────────────────────────────────────
+function editMessage(btn) {
+  const messageDiv = btn.closest('.message');
+  const bubble = messageDiv.querySelector('.bubble');
+  const originalText = bubble.innerText;
+  
+  // Save original HTML in case of cancel
+  bubble.dataset.originalHtml = bubble.innerHTML;
+  
+  bubble.innerHTML = `
+    <textarea class="edit-textarea">${originalText}</textarea>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <button class="edit-save-btn" onclick="saveEdit(this)">Save</button>
+      <button class="edit-cancel-btn" onclick="cancelEdit(this)">Cancel</button>
+    </div>
+  `;
+  
+  btn.style.display = 'none';
+  const textarea = bubble.querySelector('textarea');
+  textarea.focus();
+  textarea.style.height = textarea.scrollHeight + 'px';
+}
+
+function cancelEdit(btn) {
+  const messageDiv = btn.closest('.message');
+  const bubble = messageDiv.querySelector('.bubble');
+  bubble.innerHTML = bubble.dataset.originalHtml;
+  messageDiv.querySelector('.edit-btn').style.display = 'block';
+}
+
+async function saveEdit(btn) {
+  const messageDiv = btn.closest('.message');
+  const bubble = messageDiv.querySelector('.bubble');
+  const newText = bubble.querySelector('textarea').value.trim();
+  
+  if (!newText) return cancelEdit(btn);
+
+  // 1. Remove the subsequent assistant message if it exists
+  const nextMsg = messageDiv.nextElementSibling;
+  if (nextMsg && nextMsg.classList.contains('assistant')) {
+    nextMsg.remove();
+  }
+
+  // 2. Update the user bubble
+  bubble.innerHTML = newText.replace(/\n/g, '<br>');
+  messageDiv.querySelector('.edit-btn').style.display = 'block';
+
+  // 3. Re-trigger AI response
+  await getAIResponse(newText);
+}
