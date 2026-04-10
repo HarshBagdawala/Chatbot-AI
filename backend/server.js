@@ -607,6 +607,7 @@ app.post('/api/register', async (req, res) => {
   if (username.toLowerCase() === 'guest') return res.status(400).json({ error: 'Username not allowed' });
 
   try {
+    console.log(`[Auth] Attempting to register user: ${username}`);
     // Check if user already exists
     const { data: existingUser, error: checkError } = await supabase
       .from('users')
@@ -615,6 +616,7 @@ app.post('/api/register', async (req, res) => {
       .single();
 
     if (existingUser) {
+      console.log(`[Auth] Registration failed: Username ${username} already exists.`);
       return res.status(400).json({ error: 'Username already exists' });
     }
 
@@ -623,12 +625,16 @@ app.post('/api/register', async (req, res) => {
       .from('users')
       .insert([{ username, password }]);
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      console.error("[Auth] Database error during registration:", insertError.message);
+      throw insertError;
+    }
 
+    console.log(`[Auth] User registered successfully: ${username}`);
     res.json({ success: true });
   } catch (err) {
-    console.error("Registration error:", err.message);
-    res.status(500).json({ error: 'Could not register user' });
+    console.error("[Auth] Registration exception:", err.message);
+    res.status(500).json({ error: 'Registration failed: ' + err.message });
   }
 });
 
@@ -637,6 +643,7 @@ app.post('/api/login', async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
 
   try {
+    console.log(`[Auth] Login attempt for user: ${username}`);
     const { data: user, error: loginError } = await supabase
       .from('users')
       .select('username')
@@ -645,13 +652,15 @@ app.post('/api/login', async (req, res) => {
       .single();
 
     if (loginError || !user) {
+      console.log(`[Auth] Login failed for ${username}: ${loginError ? loginError.message : 'User not found'}`);
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
+    console.log(`[Auth] Login success for: ${username}`);
     res.json({ success: true, username: user.username });
   } catch (err) {
-    console.error("Login error:", err.message);
-    res.status(500).json({ error: 'Something went wrong during login' });
+    console.error("[Auth] Login exception:", err.message);
+    res.status(500).json({ error: 'Login failed: ' + err.message });
   }
 });
 
