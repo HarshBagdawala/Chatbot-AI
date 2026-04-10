@@ -350,17 +350,18 @@ function appendMessage(role, content, options = {}) {
              onload="document.getElementById('skeleton_${randomId}').style.display='none'; this.style.opacity='1'"
              onerror="this.src='https://via.placeholder.com/512?text=Image+Load+Failed'; document.getElementById('skeleton_${randomId}').style.display='none'">
         <div class="image-actions">
-          <a href="${imageUrl}" download="ai-generated-image.png" target="_blank" class="download-btn">
+          <button onclick="downloadImage('${imageUrl}')" class="download-btn">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
             Save Image
-          </a>
+          </button>
         </div>
       </div>
     `;
+
     if (!formatted) formatted = "I've generated this image for you: 🎨";
   }
 
@@ -1159,3 +1160,37 @@ async function processImageRequest(msg, isNewSession) {
 }
 
 
+
+/**
+ * Robust Image Download Helper
+ */
+async function downloadImage(url) {
+  try {
+    showToast("📥 Starting download...");
+    const response = await fetch(url);
+    const blob = await response.blob();
+    
+    // Determine extension from content-type or fallback to .jpg
+    let ext = 'jpg';
+    const type = blob.type;
+    if (type.includes('png')) ext = 'png';
+    else if (type.includes('webp')) ext = 'webp';
+    
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = i-edited-image-.;
+    document.body.appendChild(link);
+    link.click();
+    
+    // Cleanup
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+    showToast("✅ Image saved to your PC!");
+  } catch (err) {
+    console.error("Download failed:", err);
+    // Fallback: Just try opening it in a new tab
+    window.open(url, '_blank');
+    showToast("⚠️ Direct download failed, opening in new tab instead.");
+  }
+}
