@@ -867,6 +867,42 @@ app.delete("/api/history/:session_id", async (req, res) => {
   }
 });
 
+// Rename chat session
+app.patch("/api/sessions/:session_id", async (req, res) => {
+  const { session_id } = req.params;
+  const { title } = req.body;
+
+  if (!title) return res.status(400).json({ error: "Title is required" });
+
+  try {
+    // 1. Find the first message (oldest) for this session
+    const { data: firstMsg, error: fetchError } = await supabase
+      .from("chat_messages")
+      .select("id")
+      .eq("session_id", session_id)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .single();
+
+    if (fetchError || !firstMsg) {
+      return res.status(404).json({ error: "Session not found or empty" });
+    }
+
+    // 2. Update its content
+    const { error: updateError } = await supabase
+      .from("chat_messages")
+      .update({ content: title })
+      .eq("id", firstMsg.id);
+
+    if (updateError) throw updateError;
+
+    res.json({ success: true, message: "Chat renamed successfully!" });
+  } catch (err) {
+    console.error("Rename error:", err.message);
+    res.status(500).json({ error: "Could not rename chat." });
+  }
+});
+
 
 
 // ─── Banner Creation Route ──────────────────────────────────────────────────

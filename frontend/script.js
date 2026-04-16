@@ -263,8 +263,18 @@ async function loadSessions() {
       data.sessions.forEach(session => {
         const item = document.createElement('div');
         item.className = `sidebar-item ${session.session_id === sessionId ? 'active' : ''}`;
-        item.innerHTML = `<div class="sidebar-item-content">${session.title || 'New Chat'}</div>`;
-        item.onclick = () => selectSession(session.session_id);
+        item.innerHTML = `
+          <div class="sidebar-item-content" onclick="selectSession('${session.session_id}')">
+            ${session.title || 'New Chat'}
+          </div>
+          <div class="sidebar-item-actions">
+            <button class="sidebar-dots-btn" onclick="toggleSidebarMenu(event, '${session.session_id}')">⋮</button>
+            <div class="sidebar-dropdown" id="dropdown-${session.session_id}">
+              <button onclick="renameChatSession(event, '${session.session_id}', '${(session.title || '').replace(/'/g, "\\'")}')">✏️ Rename</button>
+              <button onclick="deleteChatSession(event, '${session.session_id}')" class="delete">🗑️ Delete</button>
+            </div>
+          </div>
+        `;
         sidebarHistory.appendChild(item);
       });
     } else {
@@ -299,6 +309,60 @@ function startNewChat() {
   chatBox.innerHTML = '';
   showWelcome();
   loadSessions();
+}
+
+// ─── Sidebar Menu Logic ──────────────────────────────────────────────────────
+function toggleSidebarMenu(event, id) {
+  event.stopPropagation();
+  const menu = document.getElementById(`dropdown-${id}`);
+  
+  // Close all other menus first
+  document.querySelectorAll('.sidebar-dropdown.show').forEach(m => {
+    if (m !== menu) m.classList.remove('show');
+  });
+  
+  menu.classList.toggle('show');
+}
+
+// Close menus when clicking anywhere else
+document.addEventListener('click', () => {
+  document.querySelectorAll('.sidebar-dropdown.show').forEach(m => m.classList.remove('show'));
+});
+
+async function deleteChatSession(event, id) {
+  event.stopPropagation();
+  if (!confirm("Are you sure you want to delete this chat?")) return;
+  
+  try {
+    const res = await fetch(`/api/history/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error("Failed to delete");
+    
+    showToast("🗑️ Chat deleted");
+    if (sessionId === id) startNewChat();
+    else loadSessions();
+  } catch (err) {
+    showToast("❌ Error: " + err.message);
+  }
+}
+
+async function renameChatSession(event, id, oldTitle) {
+  event.stopPropagation();
+  const newTitle = prompt("Enter new chat name:", oldTitle);
+  if (!newTitle || newTitle === oldTitle) return;
+  
+  try {
+    const res = await fetch(`/api/sessions/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newTitle })
+    });
+    if (!res.ok) throw new Error("Failed to rename");
+    
+    showToast("✏️ Chat renamed");
+    loadSessions();
+  } catch (err) {
+    showToast("❌ Error: " + err.message);
+  }
 }
 
 function showWelcome() {
