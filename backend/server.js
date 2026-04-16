@@ -12,6 +12,32 @@ const axios = require("axios");
 const { HfInference } = require("@huggingface/inference");
 const pdf = require("pdf-parse");
 
+// ─── Clients & Setup ────────────────────────────────────────────────────────
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      "image/jpeg", "image/png", "image/webp",
+      "application/pdf", "text/plain"
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only images (JPEG, PNG, WebP) and documents (PDF, TXT) are allowed"));
+    }
+  },
+});
+
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const hf = process.env.HF_TOKEN ? new HfInference(process.env.HF_TOKEN.trim()) : null;
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
+
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -104,35 +130,7 @@ app.post("/api/chat/document", upload.array("files", 1), async (req, res) => {
   }
 });
 
-// ─── Multer Setup ────────────────────────────────────────────────────────────
-const storage = multer.memoryStorage();
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = [
-      "image/jpeg", "image/png", "image/webp",
-      "application/pdf", "text/plain"
-    ];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only images (JPEG, PNG, WebP) and documents (PDF, TXT) are allowed"));
-    }
-  },
-});
-
-// ─── Clients ────────────────────────────────────────────────────────────────
-
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const hf = process.env.HF_TOKEN ? new HfInference(process.env.HF_TOKEN.trim()) : null;
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
 
 // ─── Web Search ──────────────────────────────────────────────────────────────
 async function performWebSearch(query) {
@@ -198,113 +196,7 @@ async function performWebSearch(query) {
   }
 }
 
-/*
-async function searchYoutubeOfficial(query) {
-  const apiKey = process.env.YOUTUBE_API_KEY;
-  if (!apiKey || apiKey.includes('your_youtube_api_key_here')) return null;
 
-  try {
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&key=${apiKey}&maxResults=1&type=video`;
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (data.items && data.items.length > 0) {
-      console.log(`[Music Search] Found official video ID: ${data.items[0].id.videoId}`);
-      return data.items[0].id.videoId;
-    }
-    return null;
-  } catch (err) {
-    console.error("Official YouTube search failed:", err.message);
-    return null;
-  }
-}
-
-async function searchInvidious(query) {
-  // Rotate through stable public instances
-  const instances = [
-    'https://iv.melmac.space',
-    'https://invidious.flokinet.to',
-    'https://invidious.projectsegfau.lt',
-    'https://invidious.perennialte.ch'
-  ];
-
-  for (const instance of instances) {
-    try {
-      const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
-      const response = await fetch(url, { signal: AbortSignal.timeout(3000) }); // 3s timeout
-      if (!response.ok) continue;
-      
-      const data = await response.json();
-      if (data && data.length > 0 && data[0].videoId) {
-        console.log(`[Music Search] Found Invidious video ID (${instance}): ${data[0].videoId}`);
-        return data[0].videoId;
-      }
-    } catch (err) {
-      continue; // Try next instance
-    }
-  }
-  return null;
-}
-
-async function searchYoutubeVideo(query) {
-  // 1. Try Official API first
-  const officialId = await searchYoutubeOfficial(query);
-  if (officialId) return officialId;
-
-  // 2. Try Invidious (Key-less & Reliable fallback)
-  const invidiousId = await searchInvidious(query);
-  if (invidiousId) return invidiousId;
-
-  // 3. Fallback to Scraper (Local dev fallback)
-  try {
-    // Strategy 1: Search DuckDuckGo specifically for video links
-    const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent("youtube " + query)}`;
-    const response = await fetch(searchUrl, {
-      method: "GET",
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-      }
-    });
-
-    if (!response.ok) return null;
-    
-    const html = await response.text();
-    
-    // Multiple regex patterns for video IDs
-    const patterns = [
-      /watch\?v=([a-zA-Z0-9_-]{11})/,
-      /video\/([a-zA-Z0-9_-]{11})/,
-      /v=([a-zA-Z0-9_-]{11})/,
-      /vi\/([a-zA-Z0-9_-]{11})/
-    ];
-
-    for (const pattern of patterns) {
-      const match = html.match(pattern);
-      if (match && match[1]) return match[1];
-    }
-
-    // Strategy 2: Try another search if first one fails
-    const searchUrl2 = `https://html.duckduckgo.com/html/?q=${encodeURIComponent("site:youtube.com " + query)}`;
-    const response2 = await fetch(searchUrl2, {
-      method: "GET",
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    });
-    
-    if (response2.ok) {
-        const html2 = await response2.text();
-        const match2 = html2.match(/watch\?v=([a-zA-Z0-9_-]{11})/);
-        if (match2) return match2[1];
-    }
-
-    console.warn(`[Music Search] Could not find video ID for: ${query}. HTML snippet: ${html.substring(0, 300)}`);
-    return null;
-  } catch (err) {
-    console.error("YouTube search failed:", err.message);
-    return null;
-  }
-}
-*/
 
 
 // ─── Weather API (OpenWeatherMap) ───────────────────────────────────────────
@@ -608,7 +500,6 @@ Key behavior rules:
 2. Provide accurate, clear, and helpful answers on any topic.
 3. For complex topics, break down your answer into simple steps. 🔢
 4. If you don't know something, be honest and say so.
-5. MUSIC REQUESTS: If the user asks you to play a song or music (e.g., "play some music", "play Believer by Imagine Dragons"), you MUST include exactly this tag in your response: \`[PLAY_MUSIC: song_name]\` (replace song_name with the requested song title, or "Relaxing Lofi Music" if no specific song is requested). 🎵
 6. WEATHER: For ANY questions about weather, temperature, or forecasts for ANY city, region, or country globally, you MUST use the 'get_weather' tool. Do NOT guess or use old data. Always return a rich weather report with full live details, local time, temperature range, humidity, wind, visibility, sunrise/sunset, and a helpful tip. Always format the weather answer using Markdown-style headings, bold labels, and clear bullet lists. This must work for any city name the user provides. 🌦️
 7. WEB SEARCH: For other real-time news or general facts, use 'search_web'. 🔍
 8. IMAGE GENERATION: If the user asks to "generate", "create", "draw", or "make" an image, use the 'generate_image' tool. After the tool returns a URL, you MUST include the tag \`[IMAGE_GEN: url]\` in your final response to display it. 🎨
@@ -976,18 +867,7 @@ app.delete("/api/history/:session_id", async (req, res) => {
   }
 });
 
-/*
-// Music search endpoint
-app.get("/api/music/search", async (req, res) => {
-  const { q } = req.query;
-  if (!q) return res.status(400).json({ error: "Query is required" });
-  
-  const videoId = await searchYoutubeVideo(q);
-  if (!videoId) return res.status(404).json({ error: "Music not found" });
-  
-  res.json({ videoId });
-});
-*/
+
 
 // ─── Banner Creation Route ──────────────────────────────────────────────────
 app.post("/api/banner/create", upload.array("images", 5), async (req, res) => {

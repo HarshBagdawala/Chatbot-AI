@@ -123,94 +123,7 @@ if (passwordInput) {
 }
 
 
-// ─── Voice AI Setup (Web Speech API) ─────────────────────────────────────────
-let aiVoiceEnabled = true;
-const voiceToggleBtn = document.getElementById('voiceToggleBtn');
-const micBtn = document.getElementById('micBtn');
 
-function toggleAIVoice() {
-  aiVoiceEnabled = !aiVoiceEnabled;
-  if (aiVoiceEnabled) {
-    if (voiceToggleBtn) voiceToggleBtn.classList.add('active');
-    showToast('🔊 AI Voice Enabled');
-  } else {
-    if (voiceToggleBtn) voiceToggleBtn.classList.remove('active');
-    window.speechSynthesis.cancel();
-    showToast('🔇 AI Voice Muted');
-  }
-}
-
-// Load and select a female voice
-let availableVoices = [];
-if ('speechSynthesis' in window) {
-  availableVoices = window.speechSynthesis.getVoices();
-  window.speechSynthesis.onvoiceschanged = () => {
-    availableVoices = window.speechSynthesis.getVoices();
-  };
-}
-
-function getFemaleVoice() {
-  if (!availableVoices.length) availableVoices = window.speechSynthesis.getVoices();
-  return availableVoices.find(v =>
-    v.name.includes('Female') ||
-    v.name.includes('Zira') ||
-    v.name.includes('Samantha') ||
-    v.name.includes('Victoria') ||
-    v.name.includes('Aditi') || 
-    (v.lang.includes('hi-IN') && !v.name.includes('Male'))
-  ) || availableVoices.find(v => v.lang.startsWith('en') && v.name.includes('Female')) || availableVoices[0];
-}
-
-function speakText(text) {
-  if (!aiVoiceEnabled || !('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  let cleanText = text.replace(/```[\s\S]*?```/g, ' Code snippet. ').replace(/[_*`#]/g, '');
-  const utterance = new SpeechSynthesisUtterance(cleanText);
-  const femaleVoice = getFemaleVoice();
-  if (femaleVoice) {
-    utterance.voice = femaleVoice;
-    utterance.lang = femaleVoice.lang;
-  }
-  window.speechSynthesis.speak(utterance);
-}
-
-let recognition;
-let isRecording = false;
-if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SpeechRecognition();
-  recognition.continuous = false;
-  recognition.lang = navigator.language || 'en-US';
-  recognition.interimResults = false;
-
-  recognition.onstart = () => {
-    isRecording = true;
-    if (micBtn) micBtn.classList.add('listening');
-    userInput.placeholder = "Listening...";
-  };
-
-  recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript;
-    userInput.value += (userInput.value ? ' ' : '') + transcript;
-    userInput.value = userInput.value.trim();
-    sendMessage(true);
-  };
-
-  recognition.onend = () => {
-    stopRecording();
-  };
-}
-
-function toggleRecording() {
-  if (!recognition) return showToast('⚠️ Speech Recognition not supported.');
-  isRecording ? recognition.stop() : recognition.start();
-}
-
-function stopRecording() {
-  isRecording = false;
-  if (micBtn) micBtn.classList.remove('listening');
-  if (userInput) userInput.placeholder = "Ask me anything...";
-}
 
 // ─── Sidebar Overlay ──────────────────────────────────────────────────────────
 const appCont = document.querySelector('.app-container');
@@ -398,7 +311,7 @@ function showWelcome() {
 }
 
 // ─── Message Sending ──────────────────────────────────────────────────────────
-async function sendMessage(isVoice = false) {
+async function sendMessage() {
   const msg = userInput.value.trim();
   if (!msg || sendBtn.disabled) return;
   const isNewSession = !sessionId;
@@ -412,12 +325,12 @@ async function sendMessage(isVoice = false) {
   }
 
   appendMessage('user', msg);
-  await getAIResponse(msg, isVoice, isNewSession);
+  await getAIResponse(msg, isNewSession);
   sendBtn.disabled = false;
   userInput.focus();
 }
 
-async function getAIResponse(msg, isVoice = false, isNewSession = false) {
+async function getAIResponse(msg, isNewSession = false) {
   showTyping();
   try {
     const res = await fetch('/api/chat', {
@@ -433,7 +346,6 @@ async function getAIResponse(msg, isVoice = false, isNewSession = false) {
     sessionId = data.session_id;
     localStorage.setItem('chat_session_id', sessionId);
     appendMessage('assistant', aiReply);
-    if (isVoice) speakText(aiReply);
     if (isNewSession) loadSessions();
   } catch (err) {
     hideTyping();

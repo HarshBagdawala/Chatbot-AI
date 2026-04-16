@@ -121,12 +121,7 @@
               <line x1="21" y1="12" x2="9" y2="12"></line>
             </svg>
           </button>
-          <button class="btn-voice-toggle active" id="voiceToggleBtn" onclick="toggleAIVoice()" title="Toggle AI Voice">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 5L6 9H2v6h4l5 4V5z"></path>
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-            </svg>
-          </button>
+
         </div>
 
       </header>
@@ -172,14 +167,7 @@
             🔍
           </button> -->
           <textarea id="userInput" placeholder="Ask me anything..." rows="1"></textarea>
-          <button class="mic-btn" id="micBtn" onclick="toggleRecording()" title="Speak">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-              <line x1="12" y1="19" x2="12" y2="23"></line>
-              <line x1="8" y1="23" x2="16" y2="23"></line>
-            </svg>
-          </button>
+
           <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Send">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
@@ -197,29 +185,6 @@
   <div class="toast" id="toast"></div>
 
   <!-- Music Player UI -->
-  <div class="music-player disabled" id="musicPlayer">
-    <div class="music-info">
-      <div class="music-icon" id="musicIcon">🎵</div>
-      <div class="music-details">
-        <p class="music-title" id="musicTitle">Searching music...</p>
-        <p class="music-status">YouTube Music</p>
-      </div>
-    </div>
-    <div class="music-controls">
-      <button class="music-btn" onclick="toggleMusic()" id="musicTogglePlayBtn" title="Play/Pause">
-        <svg viewBox="0 0 24 24" id="playPauseIcon" fill="currentColor">
-          <path d="M8 5v14l11-7z" id="playIcon" />
-        </svg>
-      </button>
-      <button class="music-btn close-btn" onclick="closeMusic()" title="Close Player">✖</button>
-    </div>
-    <!-- Hidden YT Player (1x1 but technically visible for autoplay) -->
-    <div id="ytplayer"
-      style="position:fixed; width:1px; height:1px; opacity:0.01; bottom:0; right:0; pointer-events:none; z-index:-1;">
-    </div>
-  </div>
-
-  <script src="https://www.youtube.com/iframe_api"></script>
   <script src="script.js"></script>
 </body>
 
