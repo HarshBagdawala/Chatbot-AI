@@ -622,7 +622,7 @@ app.post('/api/login', async (req, res) => {
 
 // Send a message
 app.post("/api/chat", async (req, res) => {
-  const { message, session_id, username } = req.body;
+  const { message, session_id, username, parent_id } = req.body;
 
   if (!message || !message.trim()) {
     return res.status(400).json({ error: "Message is required" });
@@ -639,18 +639,24 @@ app.post("/api/chat", async (req, res) => {
 
       // Save to Supabase if not guest
       if (username !== 'guest') {
+        const uId = uuidv4();
+        const aId = uuidv4();
         const { error: insertError } = await supabase
           .from("chat_messages")
           .insert([
             {
+              id: uId,
               session_id: sessionId,
               role: "user",
               content: message,
+              parent_id: req.body.parent_id || null
             },
             {
+              id: aId,
               session_id: sessionId,
               role: "assistant",
               content: assistantReply,
+              parent_id: uId
             },
           ]);
 
@@ -662,10 +668,14 @@ app.post("/api/chat", async (req, res) => {
       return res.json({
         reply: assistantReply,
         session_id: sessionId,
+        id: aId, // Return assistant message ID
+        user_message_id: uId // Return user message ID
       });
     }
 
     // 1. Fetch last 15 messages for context from Supabase
+    // Note: To be fully branch-aware, we'd need a recursive CTE or multiple fetches.
+    // For now, we'll fetch the most recent ones as a flat list, which works well for the active branch.
     let { data: history, error: historyError } = await supabase
       .from("chat_messages")
       .select("role, content")
@@ -825,19 +835,25 @@ app.post("/api/chat", async (req, res) => {
     const assistantReply = assistantMessage?.content || "Sorry, I could not generate a response.";
 
     // 4. Save user message + assistant reply to Supabase (Enables memory for both Guest and Users)
+    let uId = uuidv4();
+    let aId = uuidv4();
     if (true) {
       const { error: insertError } = await supabase
         .from("chat_messages")
         .insert([
           {
+            id: uId,
             session_id: sessionId,
             role: "user",
             content: message,
+            parent_id: parent_id || null
           },
           {
+            id: aId,
             session_id: sessionId,
             role: "assistant",
             content: assistantReply,
+            parent_id: uId
           },
         ]);
 
@@ -850,6 +866,8 @@ app.post("/api/chat", async (req, res) => {
     res.json({
       reply: assistantReply,
       session_id: sessionId,
+      id: aId,
+      user_message_id: uId
     });
   } catch (err) {
     console.error("Server error:", err.message);
@@ -864,7 +882,7 @@ app.get("/api/history/:session_id", async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("chat_messages")
-      .select("role, content, created_at")
+      .select("id, role, content, created_at, parent_id")
       .eq("session_id", session_id)
       .order("created_at", { ascending: true });
 

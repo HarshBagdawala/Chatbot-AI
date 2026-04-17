@@ -1,6 +1,8 @@
 let sessionId = localStorage.getItem('chat_session_id') || null;
 let currentUsername = localStorage.getItem('chat_username') || null;
 let messageIndex = 0;
+let allChatMessages = []; // For tree management
+let activeLeafId = null;  // Latest assistant message ID in current branch
 
 const chatBox = document.getElementById('chatBox');
 const userInput = document.getElementById('userInput');
@@ -242,14 +244,99 @@ function appendMessage(role, content, options = {}) {
     <div class="avatar">${avatar}</div>
     <div class="message-body">
       <div class="message-content">
-        ${role === 'user' ? '<button class="edit-btn" onclick="editMessage(this)">✏️</button>' : ''}
         <div class="bubble">${formatted}${imageHTML}</div>
+        <div class="message-actions">
+           ${role === 'user' ? `
+            <div class="msg-pagination" id="pag-${options.id || ''}"></div>
+            <button class="action-btn" onclick="copyMessage('${(content || '').replace(/'/g, "\\'")}')" title="Copy">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+            <button class="action-btn" onclick="editMessage(this, '${options.id || ''}')" title="Edit">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </button>
+           ` : `
+            <button class="action-btn" onclick="copyMessage('${(content || '').replace(/'/g, "\\'")}')" title="Copy">
+               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+           `}
+        </div>
       </div>
       <div class="time">${getTime()}</div>
     </div>`;
+  
   chatBox.appendChild(div);
+  
+  // Render pagination if siblings exist
+  if (role === 'user' && options.id) {
+    updatePaginationUI(options.id);
+  }
+
   chatBox.scrollTop = chatBox.scrollHeight;
   return div;
+}
+
+function updatePaginationUI(id) {
+  const pagDiv = document.getElementById(`pag-${id}`);
+  if (!pagDiv) return;
+  const msg = allChatMessages.find(m => m.id === id);
+  if (!msg) return;
+  
+  const siblings = allChatMessages.filter(m => m.parent_id === msg.parent_id && m.role === 'user');
+  if (siblings.length < 2) return;
+
+  const index = siblings.findIndex(m => m.id === id) + 1;
+  pagDiv.innerHTML = `
+    <button onclick="switchVersion('${id}', -1)" ${index === 1 ? 'disabled' : ''}>&lt;</button>
+    <span>${index}/${siblings.length}</span>
+    <button onclick="switchVersion('${id}', 1)" ${index === siblings.length ? 'disabled' : ''}>&gt;</button>
+  `;
+}
+
+async function switchVersion(id, dir) {
+  const msg = allChatMessages.find(m => m.id === id);
+  if (!msg) return;
+  
+  const siblings = allChatMessages.filter(m => m.parent_id === msg.parent_id && m.role === 'user');
+  const index = siblings.findIndex(m => m.id === id);
+  const nextTarget = siblings[index + dir];
+  
+  if (nextTarget) {
+    activeLeafId = findDeepestLeaf(nextTarget.id);
+    renderActiveBranch();
+  }
+}
+
+function findDeepestLeaf(id) {
+  const children = allChatMessages.filter(m => m.parent_id === id);
+  if (children.length === 0) return id;
+  // Pick the latest child (last in array)
+  return findDeepestLeaf(children[children.length - 1].id);
+}
+
+function renderActiveBranch() {
+  chatBox.innerHTML = '';
+  if (!activeLeafId) {
+    showWelcome();
+    return;
+  }
+  
+  const branch = [];
+  let currId = activeLeafId;
+  let safety = 0;
+  while (currId && safety < 100) {
+    safety++;
+    const m = allChatMessages.find(msg => msg.id === currId);
+    if (m) {
+      branch.unshift(m);
+      currId = m.parent_id;
+    } else currId = null;
+  }
+  
+  branch.forEach(m => appendMessage(m.role, m.content, { id: m.id }));
+}
+
+function copyMessage(text) {
+  navigator.clipboard.writeText(text).then(() => showToast("📋 Copied to clipboard"));
 }
 
 // ─── Session Management ──────────────────────────────────────────────────────
@@ -288,9 +375,16 @@ async function loadHistory(id) {
     const res = await fetch(`/api/history/${id}`);
     const data = await res.json();
     chatBox.innerHTML = '';
-    if (data.messages?.length > 0) {
-      data.messages.forEach(m => appendMessage(m.role, m.content));
-    } else { showWelcome(); }
+    allChatMessages = data.messages || [];
+    
+    if (allChatMessages.length > 0) {
+      // Find the latest message to be the active leaf
+      activeLeafId = allChatMessages[allChatMessages.length - 1].id;
+      renderActiveBranch();
+    } else {
+      activeLeafId = null;
+      showWelcome();
+    }
     loadSessions();
   } catch (err) { showToast('❌ Could not load chat'); }
 }
@@ -300,6 +394,8 @@ function selectSession(id) {
   sessionId = id;
   localStorage.setItem('chat_session_id', sessionId);
   chatBox.innerHTML = '';
+  allChatMessages = [];
+  activeLeafId = null;
   loadHistory(sessionId);
 }
 
@@ -389,27 +485,34 @@ async function sendMessage() {
   }
 
   appendMessage('user', msg);
-  await getAIResponse(msg, isNewSession);
+  // CRITICAL: Pass the current leaf ID as the parent for the new message
+  await getAIResponse(msg, isNewSession, activeLeafId);
   sendBtn.disabled = false;
   userInput.focus();
 }
 
-async function getAIResponse(msg, isNewSession = false) {
+async function getAIResponse(msg, isNewSession = false, parentId = null) {
   showTyping();
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg, session_id: sessionId, username: currentUsername })
+      body: JSON.stringify({ message: msg, session_id: sessionId, username: currentUsername, parent_id: parentId })
     });
     const data = await res.json();
     hideTyping();
     if (!res.ok) throw new Error(data.error);
 
-    let aiReply = data.reply;
     sessionId = data.session_id;
     localStorage.setItem('chat_session_id', sessionId);
-    appendMessage('assistant', aiReply);
+    
+    // Add new messages to local state
+    const userMsg = { id: data.user_message_id, role: 'user', content: msg, parent_id: parentId };
+    const assistantMsg = { id: data.id, role: 'assistant', content: data.reply, parent_id: data.user_message_id };
+    allChatMessages.push(userMsg, assistantMsg);
+    activeLeafId = assistantMsg.id;
+
+    appendMessage('assistant', data.reply, { id: data.id });
     if (isNewSession) loadSessions();
   } catch (err) {
     hideTyping();
@@ -582,23 +685,25 @@ themeOptions.forEach(opt => {
   };
 });
 // ─── Edit Functionality ──────────────────────────────────────────────────────
-function editMessage(btn) {
+function editMessage(btn, id) {
   const messageDiv = btn.closest('.message');
   const bubble = messageDiv.querySelector('.bubble');
   const originalText = bubble.innerText;
 
-  // Save original HTML in case of cancel
   bubble.dataset.originalHtml = bubble.innerHTML;
+  bubble.dataset.messageId = id;
 
   bubble.innerHTML = `
     <textarea class="edit-textarea">${originalText}</textarea>
     <div style="display:flex; gap:8px; margin-top:8px;">
-      <button class="edit-save-btn" onclick="saveEdit(this)">Save</button>
+      <button class="edit-save-btn" onclick="saveEdit(this)">Save & Submit</button>
       <button class="edit-cancel-btn" onclick="cancelEdit(this)">Cancel</button>
     </div>
   `;
 
-  btn.style.display = 'none';
+  const actions = messageDiv.querySelector('.message-actions');
+  if (actions) actions.style.display = 'none';
+  
   const textarea = bubble.querySelector('textarea');
   textarea.focus();
   textarea.style.height = textarea.scrollHeight + 'px';
@@ -608,26 +713,38 @@ function cancelEdit(btn) {
   const messageDiv = btn.closest('.message');
   const bubble = messageDiv.querySelector('.bubble');
   bubble.innerHTML = bubble.dataset.originalHtml;
-  messageDiv.querySelector('.edit-btn').style.display = 'block';
+  const actions = messageDiv.querySelector('.message-actions');
+  if (actions) actions.style.display = 'flex';
 }
 
 async function saveEdit(btn) {
   const messageDiv = btn.closest('.message');
   const bubble = messageDiv.querySelector('.bubble');
+  const msgId = bubble.dataset.messageId;
   const newText = bubble.querySelector('textarea').value.trim();
 
   if (!newText) return cancelEdit(btn);
 
-  // 1. Remove the subsequent assistant message if it exists
-  const nextMsg = messageDiv.nextElementSibling;
-  if (nextMsg && nextMsg.classList.contains('assistant')) {
-    nextMsg.remove();
+  // Find original message to get parent
+  const originalMsg = allChatMessages.find(m => m.id === msgId);
+  const parentId = originalMsg ? originalMsg.parent_id : null;
+
+  // Re-render up to the point of edit to "clear" subsequent messages in current view
+  chatBox.innerHTML = '';
+  const branch = [];
+  let currId = parentId;
+  while (currId) {
+    const m = allChatMessages.find(msg => msg.id === currId);
+    if (m) {
+      branch.unshift(m);
+      currId = m.parent_id;
+    } else currId = null;
   }
+  branch.forEach(m => appendMessage(m.role, m.content, { id: m.id }));
 
-  // 2. Update the user bubble
-  bubble.innerHTML = newText.replace(/\n/g, '<br>');
-  messageDiv.querySelector('.edit-btn').style.display = 'block';
+  // Append user message placeholder (actual will come back from server)
+  appendMessage('user', newText);
 
-  // 3. Re-trigger AI response
-  await getAIResponse(newText);
+  // Re-trigger AI response with new branch
+  await getAIResponse(newText, false, parentId);
 }

@@ -764,58 +764,137 @@ header {
   text-align: right;
 }
 
-.edit-btn {
+.message-content {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  max-width: 100%;
+}
+
+.message-actions {
+  position: absolute;
+  bottom: -28px;
+  left: 10px;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: rgba(31, 41, 55, 0.85);
+  backdrop-filter: blur(8px);
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+  animation: fadeIn 0.2s ease;
+}
+
+.message.user .message-actions {
+  left: auto;
+  right: 10px;
+}
+
+.message-body:hover .message-actions {
+  display: flex;
+}
+
+.action-btn {
   background: none;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 16px;
-  padding: 2px;
-  opacity: 0.8;
-  transition: opacity 0.2s, transform 0.2s;
-  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
 }
 
-.edit-btn:hover {
-  opacity: 1;
-  transform: scale(1.05);
+.action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.msg-pagination {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  margin-right: 4px;
+  padding-right: 8px;
+}
+
+.msg-pagination button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.msg-pagination button:hover:not(:disabled) {
+  color: #fff;
+}
+
+.msg-pagination button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .edit-textarea {
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
   color: var(--text);
   font-family: inherit;
   font-size: 15px;
   line-height: 1.6;
-  padding: 8px;
+  padding: 12px;
   width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  outline: none;
 }
 
 .edit-save-btn,
 .edit-cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--accent);
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   color: white;
   cursor: pointer;
-  font-size: 12px;
-  margin: 4px;
-  padding: 4px 8px;
-  transition: background 0.2s;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 16px;
+  transition: all 0.2s;
 }
 
 .edit-save-btn:hover {
   background: var(--accent2);
+  transform: translateY(-1px);
 }
 
 .edit-cancel-btn {
-  background: var(--danger);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
 }
 
 .edit-cancel-btn:hover {
-  background: #dc2626;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
 }
 
 /* â”€â”€ Input Area â”€â”€ */
