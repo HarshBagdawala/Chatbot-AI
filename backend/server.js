@@ -11,6 +11,8 @@ const { v4: uuidv4 } = require("uuid");
 const axios = require("axios");
 const { HfInference } = require("@huggingface/inference");
 const pdf = require("pdf-parse");
+const cheerio = require("cheerio");
+const TurndownService = require("turndown");
 
 // ─── Clients & Setup ────────────────────────────────────────────────────────
 const storage = multer.memoryStorage();
@@ -87,15 +89,15 @@ app.post("/api/chat/document", upload.array("files", 1), async (req, res) => {
 
     // 1. Build messages array
     const messages = [
-      { 
-        role: "system", 
+      {
+        role: "system",
         content: `You are a helpful AI assistant. You have been provided with a document titled "${file.originalname}". 
         
         DOCUMENT CONTENT START:
         ${contextText}
         DOCUMENT CONTENT END.
         
-        The user will ask questions about this document. Use the provided content to answer accurately. If the information is not in the document, you can use your general knowledge but mention it's not in the document.` 
+        The user will ask questions about this document. Use the provided content to answer accurately. If the information is not in the document, you can use your general knowledge but mention it's not in the document.`
       },
       { role: "user", content: message || "Please summarize this document." }
     ];
@@ -132,7 +134,52 @@ app.post("/api/chat/document", upload.array("files", 1), async (req, res) => {
 
 
 
-// ─── Web Search ──────────────────────────────────────────────────────────────
+// ─── URL Summarizer Logic ───────────────────────────────────────────────────
+async function fetchUrlContent(url) {
+  try {
+    console.log(`[URL Summarizer] Fetching content for: ${url}`);
+    
+    const response = await axios.get(url, {
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+      }
+    });
+
+    const html = response.data;
+    const $ = cheerio.load(html);
+
+    // Remove junk tags
+    $('script, style, nav, footer, header, iframe, noscript, .ads, .sidebar, #comments').remove();
+
+    // Get main content area if possible (common selectors)
+    const mainContent = $('main, article, .content, .post, .article').first();
+    const contentHtml = mainContent.length ? mainContent.html() : $('body').html();
+
+    const turndownService = new TurndownService({
+      headingStyle: 'atx',
+      codeBlockStyle: 'fenced'
+    });
+
+    let markdown = turndownService.turndown(contentHtml);
+
+    // Clean up markdown
+    markdown = markdown
+      .replace(/!\[.*?\]\(.*?\)/g, '') // Remove images
+      .replace(/\[.*?\]\(.*?\)/g, (match, text) => text) // Remove links but keep text
+      .substring(0, 15000); // Truncate for tokens
+
+    if (!markdown || markdown.trim().length < 50) {
+      return "The page content seems too short or empty. I might be blocked by the website's anti-scraping measures.";
+    }
+
+    return markdown;
+  } catch (err) {
+    console.error("[URL Summarizer] Error:", err.message);
+    if (err.code === 'ECONNABORTED') return "Request timed out. The website took too long to respond.";
+    return `Failed to visit the website: ${err.message}`;
+  }
+}
 async function performWebSearch(query) {
   try {
     // Attempting a more robust search source or better headers for DuckDuckGo
@@ -503,7 +550,7 @@ Key behavior rules:
 6. WEATHER: For ANY questions about weather, temperature, or forecasts for ANY city, region, or country globally, you MUST use the 'get_weather' tool. Do NOT guess or use old data. Always return a rich weather report with full live details, local time, temperature range, humidity, wind, visibility, sunrise/sunset, and a helpful tip. Always format the weather answer using Markdown-style headings, bold labels, and clear bullet lists. This must work for any city name the user provides. 🌦️
 7. WEB SEARCH: For other real-time news or general facts, use 'search_web'. 🔍
 8. IMAGE GENERATION: If the user asks to "generate", "create", "draw", or "make" an image, use the 'generate_image' tool. After the tool returns a URL, you MUST include the tag \`[IMAGE_GEN: url]\` in your final response to display it. 🎨
-
+9. URL SUMMARIZER: If a user provides a link (URL) and asks to summarize it, visit it, or explain what's on it, you MUST use the 'summarize_url' tool. Once you get the content, provide a concise, bulleted summary of the key points. 🌐
 
 You can help with: coding, science, history, general knowledge, math, creative writing, advice, and much more!`;
 
@@ -618,16 +665,18 @@ app.post("/api/chat", async (req, res) => {
       });
     }
 
-    // 1. Fetch last 10 messages for context from Supabase
-    const { data: history, error: historyError } = await supabase
+    // 1. Fetch last 15 messages for context from Supabase
+    let { data: history, error: historyError } = await supabase
       .from("chat_messages")
       .select("role, content")
       .eq("session_id", sessionId)
-      .order("created_at", { ascending: true })
-      .limit(10);
+      .order("created_at", { ascending: false })
+      .limit(15);
 
     if (historyError) {
       console.error("Supabase fetch error:", historyError.message);
+    } else if (history) {
+      history = history.reverse(); // Chronological order
     }
 
     // 2. Build messages array for Groq
@@ -689,6 +738,23 @@ app.post("/api/chat", async (req, res) => {
           },
         },
       },
+      {
+        type: "function",
+        function: {
+          name: "summarize_url",
+          description: "Visit a website URL and retrieve its main content for summarization or analysis.",
+          parameters: {
+            type: "object",
+            properties: {
+              url: {
+                type: "string",
+                description: "The full URL of the website to visit (e.g. 'https://example.com/article').",
+              },
+            },
+            required: ["url"],
+          },
+        },
+      },
 
     ];
 
@@ -729,6 +795,10 @@ app.post("/api/chat", async (req, res) => {
           const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(args.prompt)}?width=1024&height=1024&nologo=true&seed=${randomSeed}`;
           toolResults = `Successfully generated the image. Tell the user you've created it and MUST include this exact tag in your response: [IMAGE_GEN: ${imageUrl}]`;
           console.log(`Generated Image URL: ${imageUrl}`);
+        } else if (toolCall.function.name === 'summarize_url') {
+          const args = JSON.parse(toolCall.function.arguments);
+          console.log(`Summarizing URL: ${args.url}`);
+          toolResults = await fetchUrlContent(args.url);
         }
 
         messages.push({
@@ -754,8 +824,8 @@ app.post("/api/chat", async (req, res) => {
 
     const assistantReply = assistantMessage?.content || "Sorry, I could not generate a response.";
 
-    // 4. Save user message + assistant reply to Supabase
-    if (username !== 'guest') {
+    // 4. Save user message + assistant reply to Supabase (Enables memory for both Guest and Users)
+    if (true) {
       const { error: insertError } = await supabase
         .from("chat_messages")
         .insert([
@@ -1143,12 +1213,12 @@ if (require.main === module) {
         if (data.name) {
           console.log(`\x1b[32m✅ HuggingFace Auth: Success! logged in as ${data.name}\x1b[0m`);
         } else {
-          console.log(`\x1b[31m❌ HuggingFace Auth: Failed - ${data.error || 'Invalid Token'}\x1b[0m`);
+          // console.log(`\x1b[31m❌ HuggingFace Auth: Failed - ${data.error || 'Invalid Token'}\x1b[0m`);
         }
       }).catch(e => console.log(`\x1b[33m⚠️ HuggingFace Auth check skipped: ${e.message}\x1b[0m`));
 
     } else {
-      console.log(`\x1b[31m🖼️  HuggingFace: ❌ [Token NOT Set in .env]\x1b[0m`);
+      // console.log(`\x1b[31m🖼️  HuggingFace: ❌ [Token NOT Set in .env]\x1b[0m`);
     }
 
     console.log(`\n\x1b[90mSecurity Info: No API keys are exposed to the frontend/browser inspect tools.\x1b[0m\n`);

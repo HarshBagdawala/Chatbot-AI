@@ -2,7 +2,7 @@
   /* Default: Midnight Emerald Palette */
   --bg: #030712;
   --surface: rgba(17, 24, 39, 0.7);
-  --surface2: rgba(31, 41, 55, 0.8);
+  --surface2: rgb(31, 41, 55);
   --border: rgba(55, 65, 81, 0.5);
   --accent: #10b981;
   --accent2: #14b8a6;
@@ -23,7 +23,7 @@
   --bg: #0d0221;
   --surface: rgba(43, 0, 83, 0.6);
   --surface2: rgba(58, 0, 112, 0.7);
-  --border: rgba(255, 0, 127, 0.3);
+  --border: rgb(81, 0, 41);
   --accent: #ff007f;
   --accent2: #ff71ce;
   --accent-glow: rgba(255, 0, 127, 0.25);
@@ -40,7 +40,7 @@
 [data-theme='blue'] {
   --bg: #001220;
   --surface: rgba(2, 62, 138, 0.3);
-  --surface2: rgba(0, 71, 140, 0.4);
+  --surface2: rgb(0, 44, 88);
   --border: rgba(0, 119, 182, 0.4);
   --accent: #0077b6;
   --accent2: #00b4d8;
@@ -273,8 +273,15 @@ ul {
 }
 
 @keyframes dropdownAnim {
-  from { opacity: 0; transform: scale(0.9) translateY(-10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .sidebar-dropdown button {
@@ -1643,6 +1650,7 @@ er::before {
     text-align: center;
   }
 }
+
 /* â”€â”€ AI Image Editor & Banner Styles â”€â”€ */
 .generated-image-card {
   margin-top: 16px;
@@ -1664,8 +1672,13 @@ er::before {
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .generated-image {
@@ -1737,11 +1750,23 @@ er::before {
   gap: 4px;
 }
 
-.doc-preview.pdf { border-color: rgba(239, 68, 68, 0.4); }
-.doc-preview.txt { border-color: rgba(59, 130, 246, 0.4); }
+.doc-preview.pdf {
+  border-color: rgba(239, 68, 68, 0.4);
+}
 
-.doc-icon { font-size: 24px; }
-.doc-label { font-size: 10px; font-weight: 700; opacity: 0.8; }
+.doc-preview.txt {
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.doc-icon {
+  font-size: 24px;
+}
+
+.doc-label {
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.8;
+}
 
 .preview-item {
   position: relative;
@@ -1757,10 +1782,19 @@ er::before {
   overflow: hidden;
 }
 
-.preview-item.pdf { border-left: 4px solid var(--danger); }
-.preview-item.txt { border-left: 4px solid var(--accent2); }
+.preview-item.pdf {
+  border-left: 4px solid var(--danger);
+}
 
-.preview-icon { font-size: 20px; flex-shrink: 0; }
+.preview-item.txt {
+  border-left: 4px solid var(--accent2);
+}
+
+.preview-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
 .preview-name {
   font-size: 11px;
   white-space: nowrap;
@@ -1773,7 +1807,7 @@ er::before {
   position: absolute;
   top: 2px;
   right: 2px;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   border: none;
   color: #fff;
   border-radius: 50%;

@@ -315,12 +315,12 @@ function startNewChat() {
 function toggleSidebarMenu(event, id) {
   event.stopPropagation();
   const menu = document.getElementById(`dropdown-${id}`);
-  
+
   // Close all other menus first
   document.querySelectorAll('.sidebar-dropdown.show').forEach(m => {
     if (m !== menu) m.classList.remove('show');
   });
-  
+
   menu.classList.toggle('show');
 }
 
@@ -332,11 +332,11 @@ document.addEventListener('click', () => {
 async function deleteChatSession(event, id) {
   event.stopPropagation();
   if (!confirm("Are you sure you want to delete this chat?")) return;
-  
+
   try {
     const res = await fetch(`/api/history/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error("Failed to delete");
-    
+
     showToast("🗑️ Chat deleted");
     if (sessionId === id) startNewChat();
     else loadSessions();
@@ -349,7 +349,7 @@ async function renameChatSession(event, id, oldTitle) {
   event.stopPropagation();
   const newTitle = prompt("Enter new chat name:", oldTitle);
   if (!newTitle || newTitle === oldTitle) return;
-  
+
   try {
     const res = await fetch(`/api/sessions/${id}`, {
       method: 'PATCH',
@@ -357,7 +357,7 @@ async function renameChatSession(event, id, oldTitle) {
       body: JSON.stringify({ title: newTitle })
     });
     if (!res.ok) throw new Error("Failed to rename");
-    
+
     showToast("✏️ Chat renamed");
     loadSessions();
   } catch (err) {
@@ -461,7 +461,7 @@ function renderImagePreviews() {
     let typeClass = 'img';
     if (f.type === 'application/pdf') { icon = '📄'; typeClass = 'pdf'; }
     else if (f.type === 'text/plain') { icon = '📝'; typeClass = 'txt'; }
-    
+
     return `<div class="preview-item ${typeClass}"><span class="preview-icon">${icon}</span><span class="preview-name">${f.name}</span><button onclick="removeSelectedImage(${i})">✕</button></div>`;
   }).join('');
 }
@@ -482,7 +482,7 @@ async function processImageRequest(msg, isNewSession) {
     if (f.type === 'text/plain') return 'txt-icon';
     return URL.createObjectURL(f);
   });
-  
+
   appendMessage('user', msg || (isDocument ? 'Analyzing document...' : 'Processing images...'), { images: previews });
   showTyping();
 
@@ -493,7 +493,7 @@ async function processImageRequest(msg, isNewSession) {
   } else {
     files.forEach(f => formData.append('images', f));
   }
-  
+
   formData.append('prompt', msg || '');
   formData.append('message', msg || ''); // Support both names
   if (sessionId) formData.append('session_id', sessionId);
@@ -575,7 +575,7 @@ themeOptions.forEach(opt => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('chat_theme', theme);
     themeMenu.classList.remove('show');
-    
+
     // Update active state in menu
     themeOptions.forEach(o => o.classList.remove('active'));
     opt.classList.add('active');
@@ -586,10 +586,10 @@ function editMessage(btn) {
   const messageDiv = btn.closest('.message');
   const bubble = messageDiv.querySelector('.bubble');
   const originalText = bubble.innerText;
-  
+
   // Save original HTML in case of cancel
   bubble.dataset.originalHtml = bubble.innerHTML;
-  
+
   bubble.innerHTML = `
     <textarea class="edit-textarea">${originalText}</textarea>
     <div style="display:flex; gap:8px; margin-top:8px;">
@@ -597,7 +597,7 @@ function editMessage(btn) {
       <button class="edit-cancel-btn" onclick="cancelEdit(this)">Cancel</button>
     </div>
   `;
-  
+
   btn.style.display = 'none';
   const textarea = bubble.querySelector('textarea');
   textarea.focus();
@@ -615,7 +615,7 @@ async function saveEdit(btn) {
   const messageDiv = btn.closest('.message');
   const bubble = messageDiv.querySelector('.bubble');
   const newText = bubble.querySelector('textarea').value.trim();
-  
+
   if (!newText) return cancelEdit(btn);
 
   // 1. Remove the subsequent assistant message if it exists
