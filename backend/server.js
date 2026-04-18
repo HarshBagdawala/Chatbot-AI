@@ -138,7 +138,7 @@ app.post("/api/chat/document", upload.array("files", 1), async (req, res) => {
 async function fetchUrlContent(url) {
   try {
     console.log(`[URL Summarizer] Fetching content for: ${url}`);
-    
+
     const response = await axios.get(url, {
       timeout: 10000,
       headers: {
@@ -583,7 +583,7 @@ app.post('/api/register', async (req, res) => {
 
     if (insertError) {
       console.error("[Auth] Database error during registration:", insertError.message);
-      throw insertError;
+      return res.status(500).json({ error: 'Registration failed: ' + insertError.message });
     }
 
     console.log(`[Auth] User registered successfully: ${username}`);
@@ -605,10 +605,10 @@ app.post('/api/login', async (req, res) => {
       .select('username')
       .eq('username', username)
       .eq('password', password)
-      .single();
+      .maybeSingle(); // Better for login, returns null if not found instead of errorING
 
     if (loginError || !user) {
-      console.log(`[Auth] Login failed for ${username}: ${loginError ? loginError.message : 'User not found'}`);
+      console.log(`[Auth] Login failed for ${username}: ${loginError ? loginError.message : 'Invalid credentials'}`);
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
