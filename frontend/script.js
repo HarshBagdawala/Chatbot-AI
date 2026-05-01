@@ -493,11 +493,14 @@ async function sendMessage() {
 
 async function getAIResponse(msg, isNewSession = false, parentId = null) {
   showTyping();
+  const shapeSelect = document.getElementById('imageShapeSelect');
+  const imageShape = shapeSelect ? shapeSelect.value : 'square';
+  
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg, session_id: sessionId, username: currentUsername, parent_id: parentId })
+      body: JSON.stringify({ message: msg, session_id: sessionId, username: currentUsername, parent_id: parentId, image_shape: imageShape })
     });
     const data = await res.json();
     hideTyping();

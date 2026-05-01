@@ -622,7 +622,7 @@ app.post('/api/login', async (req, res) => {
 
 // Send a message
 app.post("/api/chat", async (req, res) => {
-  const { message, session_id, username, parent_id } = req.body;
+  const { message, session_id, username, parent_id, image_shape } = req.body;
 
   if (!message || !message.trim()) {
     return res.status(400).json({ error: "Message is required" });
@@ -802,7 +802,13 @@ app.post("/api/chat", async (req, res) => {
         } else if (toolCall.function.name === 'generate_image') {
           const args = JSON.parse(toolCall.function.arguments);
           const randomSeed = Math.floor(Math.random() * 1000000);
-          const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(args.prompt)}?width=1024&height=1024&nologo=true&seed=${randomSeed}`;
+          
+          let w = 1024;
+          let h = 1024;
+          if (image_shape === 'portrait') { w = 768; h = 1024; }
+          else if (image_shape === 'landscape') { w = 1024; h = 768; }
+
+          const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(args.prompt)}?width=${w}&height=${h}&nologo=true&seed=${randomSeed}`;
           toolResults = `Successfully generated the image. Tell the user you've created it and MUST include this exact tag in your response: [IMAGE_GEN: ${imageUrl}]`;
           console.log(`Generated Image URL: ${imageUrl}`);
         } else if (toolCall.function.name === 'summarize_url') {

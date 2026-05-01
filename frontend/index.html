@@ -153,6 +153,11 @@
       <div class="input-area">
         <div id="inputImagePreviews" class="input-image-previews"></div>
         <div class="input-wrapper">
+          <select id="imageShapeSelect" class="shape-select" title="Image Shape">
+            <option value="square">⬛ Square</option>
+            <option value="landscape">▭ Landscape</option>
+            <option value="portrait">▯ Portrait</option>
+          </select>
           <input type="file" id="imageUploadInput" multiple accept="image/*,.pdf,.txt" style="display: none;"
             onchange="handleImageSelection(event)">
           <button class="attachment-btn" id="attachBtn" onclick="document.getElementById('imageUploadInput').click()"

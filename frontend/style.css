@@ -915,6 +915,30 @@ header {
   transition: all 0.3s;
 }
 
+.shape-select {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  height: 40px;
+  margin-bottom: 2px;
+}
+
+.shape-select:hover, .shape-select:focus {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.shape-select option {
+  background: var(--surface);
+  color: var(--text);
+}
+
 .input-wrapper:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 4px var(--accent-glow);
