@@ -216,7 +216,7 @@ function appendMessage(role, content, options = {}) {
     const imageUrl = imageMatch[1].trim();
     formatted = formatted.replace(/\[IMAGE_GEN:.*?\]/gi, '').trim();
     const randomId = 'img_' + Math.random().toString(36).substr(2, 9);
-    
+
     let aspectRatio = '1/1';
     try {
       if (imageUrl.startsWith('http')) {
@@ -225,15 +225,15 @@ function appendMessage(role, content, options = {}) {
         const h = urlObj.searchParams.get('height');
         if (w && h) aspectRatio = `${w}/${h}`;
       }
-    } catch(e) {}
+    } catch (e) { }
 
     imageHTML = `
-      <div class="generated-image-card">
-        <div class="image-loading-skeleton" id="skeleton_${randomId}" style="aspect-ratio: ${aspectRatio}; width: 100%;"></div>
-        <img src="${imageUrl}" class="generated-image" style="aspect-ratio: ${aspectRatio}; object-fit: cover;"
+      <div class="generated-image-card" style="width: 100%; aspect-ratio: ${aspectRatio}; position: relative; overflow: hidden; display: flex; flex-direction: column;">
+        <div class="image-loading-skeleton" id="skeleton_${randomId}" style="position: absolute; inset: 0; width: 100%; height: 100%;"></div>
+        <img src="${imageUrl}" class="generated-image" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; margin: 0; border: none; min-height: 0;"
              onload="if(this.previousElementSibling) this.previousElementSibling.style.display='none'; this.style.opacity='1'"
              onerror="this.src='https://via.placeholder.com/512?text=Error'; if(this.previousElementSibling) this.previousElementSibling.style.display='none'; this.style.opacity='1'">
-        <div class="image-actions">
+        <div class="image-actions" style="position: absolute; bottom: 0; right: 0; left: 0; z-index: 10;">
           <button onclick="downloadImage('${imageUrl}')" class="download-btn">Save Image</button>
         </div>
       </div>`;
@@ -274,9 +274,9 @@ function appendMessage(role, content, options = {}) {
       </div>
       <div class="time">${getTime()}</div>
     </div>`;
-  
+
   chatBox.appendChild(div);
-  
+
   // Render pagination if siblings exist
   if (role === 'user' && options.id) {
     updatePaginationUI(options.id);
@@ -291,7 +291,7 @@ function updatePaginationUI(id) {
   if (!pagDiv) return;
   const msg = allChatMessages.find(m => m.id === id);
   if (!msg) return;
-  
+
   const siblings = allChatMessages.filter(m => m.parent_id === msg.parent_id && m.role === 'user');
   if (siblings.length < 2) return;
 
@@ -306,11 +306,11 @@ function updatePaginationUI(id) {
 async function switchVersion(id, dir) {
   const msg = allChatMessages.find(m => m.id === id);
   if (!msg) return;
-  
+
   const siblings = allChatMessages.filter(m => m.parent_id === msg.parent_id && m.role === 'user');
   const index = siblings.findIndex(m => m.id === id);
   const nextTarget = siblings[index + dir];
-  
+
   if (nextTarget) {
     activeLeafId = findDeepestLeaf(nextTarget.id);
     renderActiveBranch();
@@ -330,7 +330,7 @@ function renderActiveBranch() {
     showWelcome();
     return;
   }
-  
+
   const branch = [];
   let currId = activeLeafId;
   let safety = 0;
@@ -342,7 +342,7 @@ function renderActiveBranch() {
       currId = m.parent_id;
     } else currId = null;
   }
-  
+
   branch.forEach(m => appendMessage(m.role, m.content, { id: m.id }));
 }
 
@@ -387,7 +387,7 @@ async function loadHistory(id) {
     const data = await res.json();
     chatBox.innerHTML = '';
     allChatMessages = data.messages || [];
-    
+
     if (allChatMessages.length > 0) {
       // Find the latest message to be the active leaf
       activeLeafId = allChatMessages[allChatMessages.length - 1].id;
@@ -506,7 +506,7 @@ async function getAIResponse(msg, isNewSession = false, parentId = null) {
   showTyping();
   const shapeSelect = document.getElementById('imageShapeSelect');
   const imageShape = shapeSelect ? shapeSelect.value : 'auto';
-  
+
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
@@ -519,7 +519,7 @@ async function getAIResponse(msg, isNewSession = false, parentId = null) {
 
     sessionId = data.session_id;
     localStorage.setItem('chat_session_id', sessionId);
-    
+
     // Add new messages to local state
     const userMsg = { id: data.user_message_id, role: 'user', content: msg, parent_id: parentId };
     const assistantMsg = { id: data.id, role: 'assistant', content: data.reply, parent_id: data.user_message_id };
@@ -717,7 +717,7 @@ function editMessage(btn, id) {
 
   const actions = messageDiv.querySelector('.message-actions');
   if (actions) actions.style.display = 'none';
-  
+
   const textarea = bubble.querySelector('textarea');
   textarea.focus();
   textarea.style.height = textarea.scrollHeight + 'px';
