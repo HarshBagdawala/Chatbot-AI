@@ -216,10 +216,21 @@ function appendMessage(role, content, options = {}) {
     const imageUrl = imageMatch[1].trim();
     formatted = formatted.replace(/\[IMAGE_GEN:.*?\]/gi, '').trim();
     const randomId = 'img_' + Math.random().toString(36).substr(2, 9);
+    
+    let aspectRatio = '1/1';
+    try {
+      if (imageUrl.startsWith('http')) {
+        const urlObj = new URL(imageUrl);
+        const w = urlObj.searchParams.get('width');
+        const h = urlObj.searchParams.get('height');
+        if (w && h) aspectRatio = `${w}/${h}`;
+      }
+    } catch(e) {}
+
     imageHTML = `
       <div class="generated-image-card">
-        <div class="image-loading-skeleton" id="skeleton_${randomId}"></div>
-        <img src="${imageUrl}" class="generated-image" 
+        <div class="image-loading-skeleton" id="skeleton_${randomId}" style="aspect-ratio: ${aspectRatio}; width: 100%;"></div>
+        <img src="${imageUrl}" class="generated-image" style="aspect-ratio: ${aspectRatio}; object-fit: cover;"
              onload="if(this.previousElementSibling) this.previousElementSibling.style.display='none'; this.style.opacity='1'"
              onerror="this.src='https://via.placeholder.com/512?text=Error'; if(this.previousElementSibling) this.previousElementSibling.style.display='none'; this.style.opacity='1'">
         <div class="image-actions">
@@ -494,7 +505,7 @@ async function sendMessage() {
 async function getAIResponse(msg, isNewSession = false, parentId = null) {
   showTyping();
   const shapeSelect = document.getElementById('imageShapeSelect');
-  const imageShape = shapeSelect ? shapeSelect.value : 'square';
+  const imageShape = shapeSelect ? shapeSelect.value : 'auto';
   
   try {
     const res = await fetch('/api/chat', {

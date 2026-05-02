@@ -803,12 +803,18 @@ app.post("/api/chat", async (req, res) => {
           const args = JSON.parse(toolCall.function.arguments);
           const randomSeed = Math.floor(Math.random() * 1000000);
           
+          let finalShape = image_shape;
+          if (!finalShape || finalShape === 'auto') {
+            const shapes = ['square', 'portrait', 'landscape'];
+            finalShape = shapes[Math.floor(Math.random() * shapes.length)];
+          }
+
           let w = 1024;
           let h = 1024;
-          if (image_shape === 'portrait') { w = 768; h = 1024; }
-          else if (image_shape === 'landscape') { w = 1024; h = 768; }
+          if (finalShape === 'portrait') { w = 768; h = 1024; }
+          else if (finalShape === 'landscape') { w = 1024; h = 768; }
 
-          const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(args.prompt)}?width=${w}&height=${h}&nologo=true&seed=${randomSeed}`;
+          const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(args.prompt)}?width=${w}&height=${h}&nologo=true&seed=${randomSeed}&model=flux`;
           toolResults = `Successfully generated the image. Tell the user you've created it and MUST include this exact tag in your response: [IMAGE_GEN: ${imageUrl}]`;
           console.log(`Generated Image URL: ${imageUrl}`);
         } else if (toolCall.function.name === 'summarize_url') {
